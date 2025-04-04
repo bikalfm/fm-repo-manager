@@ -1,8 +1,8 @@
 import axios from 'axios';
-import { 
-  Repository, 
-  FileInfo, 
-  ContextRequest, 
+import {
+  Repository,
+  FileInfo,
+  ContextRequest,
   ContextResponse,
   RepositoryCreateRequest,
   DriveFolder,
@@ -10,7 +10,7 @@ import {
   DriveProcessingRequest,
   DriveProcessingResponse,
   DriveImportResponse,
-  DriveSyncResponse // Added missing type
+  DriveSyncResponse // Ensure this is imported
 } from '../types';
 
 // Get API URL from localStorage if available, otherwise use environment variable or default
@@ -85,7 +85,7 @@ export const processFile = async (repository: string, file: File, path: string =
   formData.append('path', path);
   formData.append('chunk_size', chunkSize.toString());
   formData.append('chunk_overlap', chunkOverlap.toString());
-  
+
   const response = await api.post(`/repository/${repository}/process`, formData, {
     headers: {
       'Content-Type': 'multipart/form-data'
@@ -100,7 +100,7 @@ export const processDirectory = async (repository: string, path: string = '', ch
   formData.append('path', path);
   formData.append('chunk_size', chunkSize.toString());
   formData.append('chunk_overlap', chunkOverlap.toString());
-  
+
   const response = await api.post(`/repository/${repository}/process-directory`, formData);
   return response.data;
 };
@@ -158,12 +158,14 @@ export const downloadDriveFolder = (folderId: string): string => {
   return `${getApiUrl()}/drive/download-folder/${folderId}`;
 };
 
-export const syncDriveToRepository = async (repository: string, overwrite: boolean = false): Promise<DriveSyncResponse> => { // Updated response type
+// Updated to use DriveSyncResponse
+export const syncDriveToRepository = async (repository: string, overwrite: boolean = false): Promise<DriveSyncResponse> => {
   const api = createApiInstance();
   const response = await api.post(`/drive/sync/${repository}`, { overwrite });
   return response.data;
 };
 
+// Kept for reference, but not used by the primary "Sync" button anymore
 export const importDriveToRepository = async (folderId: string, repository: string, overwrite: boolean = false): Promise<DriveImportResponse> => {
   const api = createApiInstance();
   const response = await api.post('/drive/import-to-repository', {
@@ -171,7 +173,8 @@ export const importDriveToRepository = async (folderId: string, repository: stri
     repository_name: repository,
     overwrite
   });
-  return response.data;};
+  return response.data;
+};
 
 export const processDriveFolder = async (request: DriveProcessingRequest): Promise<DriveProcessingResponse> => {
   const api = createApiInstance();

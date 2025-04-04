@@ -1,27 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { FolderOpen, FileText, Download, ArrowLeft, RefreshCw } from 'lucide-react';
+import { FolderOpen, FileText, Download, ArrowLeft, RefreshCw, Zap } from 'lucide-react'; // Added Zap icon for Sync
 import Card from '../components/Card';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
 import EmptyState from '../components/EmptyState';
-import { getDriveFolders, getDriveFolderContents, downloadDriveFile, downloadDriveFolder, importDriveToRepository, processDriveFolder, getRepositories } from '../api';
+import { getDriveFolders, getDriveFolderContents, downloadDriveFile, downloadDriveFolder, syncDriveToRepository, processDriveFolder, getRepositories } from '../api'; // Changed importDriveToRepository to syncDriveToRepository
 import { DriveFolder, DriveFile, DriveFolderContents } from '../types';
 import toast from 'react-hot-toast';
 
 const GoogleDrive: React.FC = () => {
-  const [rootFolders, setRootFolders] = useState<DriveFolder[]>([]); // State for /drive/folders result
-  const [folderContents, setFolderContents] = useState<DriveFolderContents | null>(null); // State for /drive/list result
+  const [rootFolders, setRootFolders] = useState<DriveFolder[]>([]);
+  const [folderContents, setFolderContents] = useState<DriveFolderContents | null>(null);
   const [currentFolderId, setCurrentFolderId] = useState<string>('root');
   const [loadingFolders, setLoadingFolders] = useState(true);
   const [loadingContents, setLoadingContents] = useState(false);
   const [repositories, setRepositories] = useState<string[]>([]);
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isSyncModalOpen, setIsSyncModalOpen] = useState(false); // Renamed from isImportModalOpen
   const [isProcessModalOpen, setIsProcessModalOpen] = useState(false);
   const [selectedRepository, setSelectedRepository] = useState('');
-  const [selectedFolderId, setSelectedFolderId] = useState('');
-  const [selectedFolderName, setSelectedFolderName] = useState('');
+  // selectedFolderId and selectedFolderName are no longer directly used for the sync API call,
+  // but keep selectedFolderName for modal title clarity if needed.
+  const [selectedFolderNameForModal, setSelectedFolderNameForModal] = useState('');
   const [overwriteFiles, setOverwriteFiles] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false); // Renamed from isImporting
   const [isProcessing, setIsProcessing] = useState(false);
   const [chunkSize, setChunkSize] = useState(500);
   const [chunkOverlap, setChunkOverlap] = useState(50);
@@ -29,16 +30,16 @@ const GoogleDrive: React.FC = () => {
   const [breadcrumbPath, setBreadcrumbPath] = useState<{id: string, name: string}[]>([]);
 
   useEffect(() => {
-    fetchRootFolders(); // Fetch root folders on mount
+    fetchRootFolders();
     fetchRepositories();
   }, []);
 
   useEffect(() => {
     if (currentFolderId && currentFolderId !== 'root') {
-      fetchFolderContents(currentFolderId); // Fetch contents only when navigating into a folder
+      fetchFolderContents(currentFolderId);
     } else {
-      setFolderContents(null); // Clear contents when back at root
-      setBreadcrumbPath([]); // Clear breadcrumbs at root
+      setFolderContents(null);
+      setBreadcrumbPath([]);
     }
   }, [currentFolderId]);
 
@@ -57,20 +58,15 @@ const GoogleDrive: React.FC = () => {
 
   const fetchFolderContents = async (folderId: string) => {
     setLoadingContents(true);
-    setFolderContents(null); // Clear previous contents
+    setFolderContents(null);
     try {
       const data = await getDriveFolderContents(folderId);
       setFolderContents(data);
-      
-      // Update breadcrumb path when navigating into a folder
       if (data.current_folder) {
-         // Check if the folder is already in the path (e.g., navigating via breadcrumb)
         const existingIndex = breadcrumbPath.findIndex(item => item.id === folderId);
         if (existingIndex !== -1) {
-          // If navigating via breadcrumb, slice the path
           setBreadcrumbPath(prev => prev.slice(0, existingIndex + 1));
         } else {
-           // If navigating directly, add to the path
           setBreadcrumbPath(prev => [...prev, {
             id: data.current_folder!.id,
             name: data.current_folder!.name
@@ -80,8 +76,6 @@ const GoogleDrive: React.FC = () => {
     } catch (error) {
       console.error("Error fetching folder contents:", error);
       toast.error('Failed to fetch folder contents');
-      // Optionally navigate back up if fetch fails
-      // navigateUp(); 
     } finally {
       setLoadingContents(false);
     }
@@ -104,14 +98,11 @@ const GoogleDrive: React.FC = () => {
   const navigateUp = () => {
     if (breadcrumbPath.length > 0) {
       const newPath = [...breadcrumbPath];
-      newPath.pop(); // Remove the current folder
+      newPath.pop();
       setBreadcrumbPath(newPath);
-      
-      // Navigate to the new last folder in the path, or root if path is now empty
       const parentFolderId = newPath.length > 0 ? newPath[newPath.length - 1].id : 'root';
       setCurrentFolderId(parentFolderId);
     } else {
-      // Should not happen if button is only shown when not at root, but handle anyway
       setCurrentFolderId('root');
     }
   };
@@ -122,10 +113,8 @@ const GoogleDrive: React.FC = () => {
     } else {
       const targetFolder = breadcrumbPath[index];
       setCurrentFolderId(targetFolder.id);
-      // Slicing path is handled in fetchFolderContents effect
     }
   };
-
 
   const handleDownloadFile = (fileId: string) => {
     window.open(downloadDriveFile(fileId), '_blank');
@@ -135,53 +124,63 @@ const GoogleDrive: React.FC = () => {
     window.open(downloadDriveFolder(folderId), '_blank');
   };
 
-  const openImportModal = (folderId: string, folderName: string) => {
-    setSelectedFolderId(folderId);
-    setSelectedFolderName(folderName);
-    setIsImportModalOpen(true);
+  // Renamed function and updated logic
+  const openSyncModal = (folderName?: string) => {
+    // folderName is now optional, mainly for context if needed, but not essential for the API call
+    setSelectedFolderNameForModal(folderName || ''); // Store for potential display use
+    setSelectedRepository(''); // Reset selected repo when opening modal
+    setIsSyncModalOpen(true);
   };
 
   const openProcessModal = (folderId: string, folderName: string) => {
-    setSelectedFolderId(folderId);
-    setSelectedFolderName(folderName);
+    // This function remains the same as it uses folder_id
+    setSelectedFolderNameForModal(folderName); // Use consistent naming
     setCollectionName(folderName.toLowerCase().replace(/[^a-z0-9_]/g, '_'));
     setIsProcessModalOpen(true);
   };
 
-  const handleImport = async () => {
-    if (!selectedRepository || !selectedFolderId) {
-      toast.error('Please select a repository');
+  // Renamed function and changed API call
+  const handleSync = async () => {
+    if (!selectedRepository) {
+      toast.error('Please select a repository to sync');
       return;
     }
-    
-    setIsImporting(true);
+
+    setIsSyncing(true);
     try {
-      const result = await importDriveToRepository(selectedFolderId, selectedRepository, overwriteFiles);
-      toast.success(`Import completed: ${result.files_imported} files imported, ${result.files_skipped} skipped`);
-      setIsImportModalOpen(false);
+      // Use syncDriveToRepository with the selected repository name
+      const result = await syncDriveToRepository(selectedRepository, overwriteFiles);
+      toast.success(`Sync completed: ${result.files_downloaded} files downloaded, ${result.files_skipped} skipped`);
+      setIsSyncModalOpen(false);
     } catch (error) {
-      console.error("Error importing files:", error);
-      toast.error('Failed to import files');
+      console.error("Error syncing repository:", error);
+      // Provide more specific error feedback if possible
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+         toast.error(`Sync failed: Google Drive folder named "${selectedRepository}" not found.`);
+      } else {
+         toast.error('Failed to sync repository');
+      }
     } finally {
-      setIsImporting(false);
+      setIsSyncing(false);
     }
   };
 
+
   const handleProcess = async () => {
-    if (!selectedFolderId || !collectionName) {
-      toast.error('Folder ID and collection name are required');
+    if (!selectedFolderId || !collectionName) { // process still needs folderId
+      toast.error('Folder ID and collection name are required for processing');
       return;
     }
-    
+
     setIsProcessing(true);
     try {
       const result = await processDriveFolder({
-        folder_id: selectedFolderId,
+        folder_id: selectedFolderId, // Pass the correct folder ID here
         collection_name: collectionName,
         chunk_size: chunkSize,
         chunk_overlap: chunkOverlap
       });
-      
+
       toast.success(`Processing started for ${result.stats.total_files_in_folder} files in collection "${result.collection_name}"`);
       setIsProcessModalOpen(false);
     } catch (error) {
@@ -202,7 +201,7 @@ const GoogleDrive: React.FC = () => {
         >
           Root
         </button>
-        
+
         {breadcrumbPath.map((folder, index) => (
           <React.Fragment key={folder.id}>
             <span className="mx-2 text-gray-500">/</span>
@@ -232,6 +231,16 @@ const GoogleDrive: React.FC = () => {
           </h2>
         </div>
         <div className="flex flex-wrap gap-2">
+           {/* Add Sync All Button - Triggers sync modal without pre-selecting folder context */}
+           <Button
+             onClick={() => openSyncModal()}
+             variant="primary" // Or another appropriate variant
+             icon={<Zap className="h-4 w-4" />}
+             className="w-full sm:w-auto"
+             disabled={isLoading}
+           >
+             Sync Repository
+           </Button>
           <Button
             onClick={isRootView ? fetchRootFolders : () => fetchFolderContents(currentFolderId)}
             variant="secondary"
@@ -287,17 +296,7 @@ const GoogleDrive: React.FC = () => {
                   </h3>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button
-                    onClick={() => openImportModal(
-                      folderContents.current_folder!.id,
-                      folderContents.current_folder!.name
-                    )}
-                    variant="outline"
-                    size="sm"
-                    className="w-full sm:w-auto"
-                  >
-                    Import
-                  </Button>
+                   {/* Keep Process button as it needs folder context */}
                   <Button
                     onClick={() => openProcessModal(
                       folderContents.current_folder!.id,
@@ -306,7 +305,7 @@ const GoogleDrive: React.FC = () => {
                     size="sm"
                     className="w-full sm:w-auto"
                   >
-                    Process
+                    Process Folder
                   </Button>
                 </div>
               </div>
@@ -376,15 +375,7 @@ const GoogleDrive: React.FC = () => {
                                 >
                                   <span className="hidden sm:inline">Download</span>
                                 </Button>
-                                <Button
-                                  onClick={() => openImportModal(folder.id, folder.name)}
-                                  variant="outline"
-                                  size="sm"
-                                  className="px-2 sm:px-2.5"
-                                >
-                                  <span className="hidden sm:inline">Import</span>
-                                  <span className="sm:hidden">Imp</span>
-                                </Button>
+                                {/* Process button still makes sense here */}
                                 <Button
                                   onClick={() => openProcessModal(folder.id, folder.name)}
                                   size="sm"
@@ -435,15 +426,7 @@ const GoogleDrive: React.FC = () => {
                                 >
                                   <span className="hidden sm:inline">Download</span>
                                 </Button>
-                                <Button
-                                  onClick={() => openImportModal(folder.id, folder.name)}
-                                  variant="outline"
-                                  size="sm"
-                                  className="px-2 sm:px-2.5"
-                                >
-                                  <span className="hidden sm:inline">Import</span>
-                                  <span className="sm:hidden">Imp</span>
-                                </Button>
+                                {/* Process button still makes sense here */}
                                 <Button
                                   onClick={() => openProcessModal(folder.id, folder.name)}
                                   size="sm"
@@ -457,7 +440,7 @@ const GoogleDrive: React.FC = () => {
                           </td>
                         </tr>
                       ))}
-                      
+
                       {!isRootView && folderContents?.files.map((file) => (
                         <tr key={file.id} className="hover:bg-gray-800">
                           <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
@@ -501,42 +484,42 @@ const GoogleDrive: React.FC = () => {
         </div>
       )}
 
-      {/* Modals (unchanged) */}
+      {/* Sync Modal - Updated */}
       <Modal
-        isOpen={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
-        title={`Import from Google Drive: ${selectedFolderName}`}
+        isOpen={isSyncModalOpen}
+        onClose={() => setIsSyncModalOpen(false)}
+        title="Sync Google Drive with Repository" // Updated title
         size="md"
         footer={
           <div className="flex justify-end space-x-3">
             <Button
               variant="secondary"
-              onClick={() => setIsImportModalOpen(false)}
-              disabled={isImporting}
+              onClick={() => setIsSyncModalOpen(false)}
+              disabled={isSyncing}
             >
               Cancel
             </Button>
             <Button
-              onClick={handleImport}
-              isLoading={isImporting}
+              onClick={handleSync} // Call handleSync
+              isLoading={isSyncing}
               disabled={!selectedRepository}
             >
-              Import
+              Sync Now
             </Button>
           </div>
         }
       >
         <div className="space-y-4">
           <p className="text-sm text-gray-400">
-            Select a repository to import files from Google Drive folder "{selectedFolderName}".
+            Select a repository to sync. This will download files from the Google Drive folder with the <span className="font-semibold text-white">same name</span> as the selected repository into that repository. Subfolders are not included.
           </p>
-          
+
           <div>
-            <label htmlFor="repository" className="block text-sm font-medium text-white mb-1">
-              Target Repository
+            <label htmlFor="repository-sync" className="block text-sm font-medium text-white mb-1">
+              Repository to Sync
             </label>
             <select
-              id="repository"
+              id="repository-sync"
               value={selectedRepository}
               onChange={(e) => setSelectedRepository(e.target.value)}
               className="block w-full border border-gray-700 rounded-md shadow-sm py-2 px-3 bg-gray-800 text-white focus:outline-none focus:ring-white focus:border-white sm:text-sm"
@@ -546,33 +529,37 @@ const GoogleDrive: React.FC = () => {
                 <option key={repo} value={repo}>{repo}</option>
               ))}
             </select>
+             <p className="mt-1 text-xs text-gray-500">
+               Ensure a Google Drive folder named "{selectedRepository || 'repository_name'}" exists and is accessible.
+             </p>
           </div>
-          
+
           <div className="flex items-center">
             <input
-              id="overwrite"
+              id="overwrite-sync"
               type="checkbox"
               checked={overwriteFiles}
               onChange={(e) => setOverwriteFiles(e.target.checked)}
               className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-700 rounded bg-gray-800"
             />
-            <label htmlFor="overwrite" className="ml-2 block text-sm text-white">
-              Overwrite existing files
+            <label htmlFor="overwrite-sync" className="ml-2 block text-sm text-white">
+              Overwrite existing files in the repository
             </label>
           </div>
-          
+
           <div className="p-3 bg-yellow-900/30 rounded-md border border-yellow-700">
             <p className="text-sm text-yellow-300">
-              <strong>Note:</strong> Only supported file types (PDF, TXT, DOCX) will be imported. Other file types will be skipped.
+              <strong>Note:</strong> Only files directly within the matching Google Drive folder will be synced. Supported file types (PDF, TXT, DOCX) will be downloaded.
             </p>
           </div>
         </div>
       </Modal>
 
+      {/* Process Modal (Remains largely unchanged, but ensure selectedFolderId is passed correctly) */}
       <Modal
         isOpen={isProcessModalOpen}
         onClose={() => setIsProcessModalOpen(false)}
-        title={`Process Google Drive Folder: ${selectedFolderName}`}
+        title={`Process Google Drive Folder: ${selectedFolderNameForModal}`}
         size="md"
         footer={
           <div className="flex justify-end space-x-3">
@@ -586,7 +573,7 @@ const GoogleDrive: React.FC = () => {
             <Button
               onClick={handleProcess}
               isLoading={isProcessing}
-              disabled={!collectionName}
+              disabled={!collectionName || !selectedFolderId} // Ensure folderId is available for processing
             >
               Process
             </Button>
@@ -595,9 +582,9 @@ const GoogleDrive: React.FC = () => {
       >
         <div className="space-y-4">
           <p className="text-sm text-gray-400">
-            Process files from Google Drive folder "{selectedFolderName}" and add them to a vector database collection.
+            Process files from Google Drive folder "{selectedFolderNameForModal}" and add them to a vector database collection.
           </p>
-          
+
           <div>
             <label htmlFor="collection-name" className="block text-sm font-medium text-white mb-1">
               Collection Name
@@ -614,7 +601,7 @@ const GoogleDrive: React.FC = () => {
               Use only letters, numbers, and underscores. No spaces or special characters.
             </p>
           </div>
-          
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label htmlFor="chunk-size" className="block text-sm font-medium text-white mb-1">
@@ -630,7 +617,7 @@ const GoogleDrive: React.FC = () => {
                 className="block w-full border border-gray-700 rounded-md shadow-sm py-2 px-3 bg-gray-800 text-white focus:outline-none focus:ring-white focus:border-white sm:text-sm"
               />
             </div>
-            
+
             <div>
               <label htmlFor="chunk-overlap" className="block text-sm font-medium text-white mb-1">
                 Chunk Overlap
@@ -646,7 +633,7 @@ const GoogleDrive: React.FC = () => {
               />
             </div>
           </div>
-          
+
           <div className="p-3 bg-yellow-900/30 rounded-md border border-yellow-700">
             <p className="text-sm text-yellow-300">
               <strong>Note:</strong> Processing may take some time depending on the number and size of files. Only PDF files will be processed.
@@ -660,13 +647,18 @@ const GoogleDrive: React.FC = () => {
 
 // Helper function to format file size
 const formatFileSize = (bytes: number): string => {
+  if (isNaN(bytes) || bytes < 0) return 'N/A'; // Handle potential NaN or negative values
   if (bytes === 0) return '0 Bytes';
-  
+
   const k = 1024;
   const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
+  // Ensure i is within the bounds of the sizes array
+  const i = Math.max(0, Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1));
+
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
+
+// Import axios for error checking
+import axios from 'axios';
 
 export default GoogleDrive;
