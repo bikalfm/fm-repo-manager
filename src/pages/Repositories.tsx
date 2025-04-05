@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, FolderPlus, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, FolderPlus, RefreshCw, Database, Search as SearchIcon } from 'lucide-react'; // Added Database, SearchIcon
 import Card from '../components/Card';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
 import EmptyState from '../components/EmptyState';
 import { getRepositories, createRepository, deleteRepository } from '../api';
 import toast from 'react-hot-toast';
+import { Link } from 'react-router-dom'; // Import Link
 
 const Repositories: React.FC = () => {
   const [repositories, setRepositories] = useState<string[]>([]);
@@ -17,6 +18,7 @@ const Repositories: React.FC = () => {
   const [newRepoDescription, setNewRepoDescription] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchRepositories();
@@ -24,35 +26,51 @@ const Repositories: React.FC = () => {
 
   const fetchRepositories = async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await getRepositories();
-      setRepositories(data);
-    } catch (error) {
+      setRepositories(data.sort()); // Sort repositories alphabetically
+    } catch (err) {
+      setError('Failed to fetch repositories. Please check API connection.');
       toast.error('Failed to fetch repositories');
+      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
   const handleCreateRepository = async () => {
-    if (!newRepoName.trim()) {
+    const trimmedName = newRepoName.trim();
+    if (!trimmedName) {
       toast.error('Repository name is required');
       return;
     }
+    // Basic validation for name (alphanumeric and underscore)
+    if (!/^[a-zA-Z0-9_]+$/.test(trimmedName)) {
+       toast.error('Invalid repository name. Use only letters, numbers, and underscores.');
+       return;
+    }
+    if (repositories.includes(trimmedName)) {
+      toast.error(`Repository "${trimmedName}" already exists.`);
+      return;
+    }
+
 
     setIsCreating(true);
+    const toastId = toast.loading(`Creating repository "${trimmedName}"...`);
     try {
       await createRepository({
-        name: newRepoName.trim(),
+        name: trimmedName,
         description: newRepoDescription.trim() || undefined
       });
-      toast.success(`Repository "${newRepoName}" created successfully`);
+      toast.success(`Repository "${trimmedName}" created successfully`, { id: toastId });
       setIsCreateModalOpen(false);
       setNewRepoName('');
       setNewRepoDescription('');
-      fetchRepositories();
+      fetchRepositories(); // Refetch the list
     } catch (error) {
-      toast.error('Failed to create repository');
+      toast.error(`Failed to create repository: ${error instanceof Error ? error.message : 'Unknown error'}`, { id: toastId });
+      console.error("Create repository error:", error);
     } finally {
       setIsCreating(false);
     }
@@ -60,14 +78,16 @@ const Repositories: React.FC = () => {
 
   const handleDeleteRepository = async () => {
     setIsDeleting(true);
+    const toastId = toast.loading(`Deleting repository "${selectedRepo}"...`);
     try {
       await deleteRepository(selectedRepo);
-      toast.success(`Repository "${selectedRepo}" deleted successfully`);
+      toast.success(`Repository "${selectedRepo}" deleted successfully`, { id: toastId });
       setIsDeleteModalOpen(false);
       setSelectedRepo('');
-      fetchRepositories();
+      fetchRepositories(); // Refetch the list
     } catch (error) {
-      toast.error('Failed to delete repository');
+      toast.error(`Failed to delete repository: ${error instanceof Error ? error.message : 'Unknown error'}`, { id: toastId });
+      console.error("Delete repository error:", error);
     } finally {
       setIsDeleting(false);
     }
@@ -88,15 +108,18 @@ const Repositories: React.FC = () => {
         </div>
         <div className="mt-4 flex md:mt-0 md:ml-4 space-x-3">
           <Button
-            onClick={() => fetchRepositories()}
+            onClick={fetchRepositories}
             variant="secondary"
             icon={<RefreshCw className="h-4 w-4" />}
+            disabled={loading}
+            title="Refresh repository list"
           >
             Refresh
           </Button>
           <Button
             onClick={() => setIsCreateModalOpen(true)}
             icon={<Plus className="h-4 w-4" />}
+            title="Create a new repository"
           >
             New Repository
           </Button>
@@ -107,47 +130,73 @@ const Repositories: React.FC = () => {
         <div className="flex justify-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
         </div>
+      ) : error ? (
+         <Card>
+           <p className="text-center text-red-400">{error}</p>
+           <div className="mt-4 text-center">
+             <Button onClick={fetchRepositories}>Retry</Button>
+           </div>
+         </Card>
       ) : repositories.length === 0 ? (
         <EmptyState
           title="No repositories found"
           description="Create a repository to start processing and searching documents."
-          icon={<FolderPlus className="h-8 w-8" />}
+          icon={<FolderPlus className="h-12 w-12" />} // Larger icon
           actionText="Create Repository"
           onAction={() => setIsCreateModalOpen(true)}
         />
       ) : (
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {repositories.map((repo) => (
-            <Card key={repo} className="hover:shadow-lg hover:shadow-gray-700 transition-shadow">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="text-lg font-medium text-white mb-1">{repo}</h3>
-                  <p className="text-sm text-gray-400">Repository</p>
+            // Added hoverEffect prop to Card
+            <Card key={repo} hoverEffect={true}>
+              <div className="flex flex-col h-full">
+                {/* Top section with title and delete button */}
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex items-center min-w-0">
+                     <Database className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0" />
+                     <h3 className="text-lg font-medium text-white truncate" title={repo}>{repo}</h3>
+                  </div>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => openDeleteModal(repo)}
+                    icon={<Trash2 className="h-4 w-4" />}
+                    className="flex-shrink-0"
+                    title={`Delete repository ${repo}`}
+                  >
+                    <span className="hidden sm:inline">Delete</span>
+                  </Button>
                 </div>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => openDeleteModal(repo)}
-                  icon={<Trash2 className="h-4 w-4" />}
-                >
-                  Delete
-                </Button>
-              </div>
-              <div className="mt-4 flex justify-between">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.location.href = `/repositories/${repo}`}
-                >
-                  View Files
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.location.href = `/search?repository=${repo}`}
-                >
-                  Search
-                </Button>
+
+                {/* Description or placeholder */}
+                <p className="text-sm text-gray-400 flex-grow mb-4">
+                  Manage files and search within this repository.
+                  {/* Placeholder for description if available */}
+                </p>
+
+                {/* Action buttons at the bottom */}
+                <div className="mt-auto flex justify-start space-x-3">
+                  <Link to={`/repositories/${repo}`}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      title={`View files in ${repo}`}
+                    >
+                      View Files
+                    </Button>
+                  </Link>
+                  <Link to={`/search?repository=${repo}`}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      icon={<SearchIcon className="h-4 w-4" />}
+                      title={`Search within ${repo}`}
+                    >
+                      Search
+                    </Button>
+                  </Link>
+                </div>
               </div>
             </Card>
           ))}
@@ -171,31 +220,36 @@ const Repositories: React.FC = () => {
             <Button
               onClick={handleCreateRepository}
               isLoading={isCreating}
+              disabled={!newRepoName.trim() || isCreating || !/^[a-zA-Z0-9_]+$/.test(newRepoName.trim())}
             >
-              Create
+              {isCreating ? 'Creating...' : 'Create'}
             </Button>
           </div>
         }
       >
         <div className="space-y-4">
           <div>
-            <label htmlFor="repo-name" className="block text-sm font-medium text-white">
-              Repository Name
+            <label htmlFor="repo-name" className="block text-sm font-medium text-white mb-1">
+              Repository Name <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               id="repo-name"
               value={newRepoName}
               onChange={(e) => setNewRepoName(e.target.value)}
-              className="mt-1 block w-full border border-gray-700 rounded-md shadow-sm py-2 px-3 bg-gray-800 text-white focus:outline-none focus:ring-white focus:border-white sm:text-sm"
+              className="block w-full border border-gray-700 rounded-md shadow-sm py-2 px-3 bg-gray-800 text-white focus:outline-none focus:ring-white focus:border-white sm:text-sm disabled:opacity-50"
               placeholder="e.g., medical_research"
+              required
+              disabled={isCreating}
+              pattern="[a-zA-Z0-9_]+"
+              title="Only letters, numbers, and underscores allowed."
             />
             <p className="mt-1 text-xs text-gray-400">
-              Use only letters, numbers, and underscores. No spaces or special characters.
+              Use only letters, numbers, and underscores. No spaces.
             </p>
           </div>
           <div>
-            <label htmlFor="repo-description" className="block text-sm font-medium text-white">
+            <label htmlFor="repo-description" className="block text-sm font-medium text-white mb-1">
               Description (Optional)
             </label>
             <textarea
@@ -203,8 +257,9 @@ const Repositories: React.FC = () => {
               value={newRepoDescription}
               onChange={(e) => setNewRepoDescription(e.target.value)}
               rows={3}
-              className="mt-1 block w-full border border-gray-700 rounded-md shadow-sm py-2 px-3 bg-gray-800 text-white focus:outline-none focus:ring-white focus:border-white sm:text-sm"
+              className="block w-full border border-gray-700 rounded-md shadow-sm py-2 px-3 bg-gray-800 text-white focus:outline-none focus:ring-white focus:border-white sm:text-sm disabled:opacity-50"
               placeholder="Brief description of this repository's purpose"
+              disabled={isCreating}
             />
           </div>
         </div>
@@ -230,14 +285,17 @@ const Repositories: React.FC = () => {
               onClick={handleDeleteRepository}
               isLoading={isDeleting}
             >
-              Delete
+              {isDeleting ? 'Deleting...' : 'Delete'}
             </Button>
           </div>
         }
       >
         <div>
-          <p className="text-sm text-gray-400">
-            Are you sure you want to delete the repository <span className="font-semibold text-white">{selectedRepo}</span>? This action cannot be undone and will permanently delete all files and data associated with this repository.
+          <p className="text-sm text-gray-300">
+            Are you sure you want to delete the repository <strong className="text-white">{selectedRepo}</strong>?
+          </p>
+          <p className="mt-2 text-sm text-red-400">
+             This action cannot be undone and will permanently delete all associated files and vector data.
           </p>
         </div>
       </Modal>

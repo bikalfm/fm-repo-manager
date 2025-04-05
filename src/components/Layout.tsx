@@ -56,7 +56,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               <div className="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
                 <div className="flex-shrink-0 flex items-center px-4">
                   <span className="text-white font-bold text-xl flex items-center">
-                    <FileText className="h-8 w-8 mr-2" />
+                    
                     Final Moment
                   </span>
                 </div>
