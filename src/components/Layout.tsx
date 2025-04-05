@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Database, Search, HardDrive, FileText, Settings, Home, Menu, X } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
+import fmlogo from '../assets/fm_logo.svg'
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -55,10 +56,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
               <div className="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
                 <div className="flex-shrink-0 flex items-center px-4">
-                  <span className="text-white font-bold text-xl flex items-center">
-                    
-                    Final Moment
+                <span className="text-white font-bold text-xl flex items-center">
+                    <img src = {fmlogo} width="50" height="50" />
                   </span>
+                    Final Moment
                 </div>
                 <nav className="mt-5 px-2 space-y-1">
                   {navigation.map((item) => (
@@ -92,10 +93,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="flex-1 flex flex-col min-h-0 border-r border-gray-700 bg-black">
           <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
             <div className="flex items-center flex-shrink-0 px-4">
-              <span className="text-white font-bold text-xl flex items-center">
-                <FileText className="h-8 w-8 mr-2" />
-                Final Moment
-              </span>
+            <img src = {fmlogo} width="25" height="25" /> <br/>
             </div>
             <nav className="mt-5 flex-1 px-2 bg-black space-y-1">
               {navigation.map((item) => (

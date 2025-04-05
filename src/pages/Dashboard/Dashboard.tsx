@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
     import Card from '../../components/Card';
     import SearchBar from '../../components/SearchBar';
     import toast from 'react-hot-toast';
+ 
 
     // Import sub-components
     import DashboardFeatureCard from './DashboardFeatureCard';
@@ -82,9 +83,11 @@ import React, { useEffect, useState } from 'react';
               <div className="md:flex md:items-center md:justify-between mb-8">
                 <div className="flex-1 min-w-0">
                   <h2 className="text-2xl font-bold leading-7 text-white sm:text-3xl sm:truncate">
-                    FM.AI Repository manager
+
+                    
+                    Repository hub
                   </h2>
-                </div>
+                </div> 
               </div>
 
               {/* Search Bar Section */}
