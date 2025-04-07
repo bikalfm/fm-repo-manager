@@ -59,7 +59,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <span className="text-white font-bold text-xl flex items-center">
                     <img src = {fmlogo} width="50" height="50" />
                   </span>
-                    Final Moment
+                  
                 </div>
                 <nav className="mt-5 px-2 space-y-1">
                   {navigation.map((item) => (
