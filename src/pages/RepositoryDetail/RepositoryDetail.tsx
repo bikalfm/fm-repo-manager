@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FolderPlus, Upload, Trash2, Download, RefreshCw, File as FileIcon, Folder as FolderIcon, ArrowLeft, CheckCircle, Play, Square, CheckSquare } from 'lucide-react'; // Added Play, Square, CheckSquare icons
+import { FolderPlus, Upload, Trash2, Download, RefreshCw, File as FileIcon, Folder as FolderIcon, ArrowLeft, CheckCircle, Play, Square, CheckSquare } from 'lucide-react';
 import Card from '../../components/Card';
 import Button from '../../components/Button';
 import Modal from '../../components/Modal';
 import FileUploader from '../../components/FileUploader';
 import EmptyState from '../../components/EmptyState';
 import Spinner from '../../components/Spinner';
-import { listRepositoryFiles, createFolder, deleteFolder, deleteFile, downloadFile, processDirectory, getProcessedFilenames, processFilesByPath } from '../../api'; // Updated API import
+import { listRepositoryFiles, createFolder, deleteFolder, deleteFiles, downloadFile, processDirectory, getProcessedFilenames, processFilesByPath, uploadFile } from '../../api'; // Updated API import: deleteFile -> deleteFiles, added uploadFile, removed processFile
 import { FileInfo } from '../../types';
 import toast from 'react-hot-toast';
 
@@ -20,13 +20,14 @@ const RepositoryDetail: React.FC = () => {
   const [currentPath, setCurrentPath] = useState(path || '');
   const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false); // For single item delete
+  const [isMultiDeleteModalOpen, setIsMultiDeleteModalOpen] = useState(false); // For multi item delete
   const [isProcessingModalOpen, setIsProcessingModalOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
-  const [selectedItem, setSelectedItem] = useState<FileInfo | null>(null);
+  const [selectedItem, setSelectedItem] = useState<FileInfo | null>(null); // For single delete target
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isProcessingUpload, setIsProcessingUpload] = useState(false); // For upload modal processing
+  const [isDeleting, setIsDeleting] = useState(false); // Used for both single and multi delete
+  const [isUploading, setIsUploading] = useState(false); // For upload modal uploading
   const [isProcessingDirectory, setIsProcessingDirectory] = useState(false);
   const [isProcessingSelected, setIsProcessingSelected] = useState(false); // For selected files processing
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
@@ -109,21 +110,27 @@ const RepositoryDetail: React.FC = () => {
     }
   };
 
+  // Handles single item deletion (both files and folders)
   const handleDeleteItem = async () => {
     if (!repositoryName || !selectedItem) return;
 
     setIsDeleting(true);
+    const itemName = selectedItem.name; // Store name before closing modal
+    const itemPath = selectedItem.path;
+    const isDirectory = selectedItem.is_directory;
+
     try {
-      if (selectedItem.is_directory) {
-        await deleteFolder(repositoryName, selectedItem.path);
-        toast.success(`Folder "${selectedItem.name}" deleted successfully`);
+      if (isDirectory) {
+        await deleteFolder(repositoryName, itemPath);
+        toast.success(`Folder "${itemName}" deleted successfully`);
       } else {
-        await deleteFile(repositoryName, selectedItem.path);
-        toast.success(`File "${selectedItem.name}" deleted successfully`);
+        // Use the new deleteFiles endpoint for single file deletion
+        await deleteFiles(repositoryName, [itemPath]);
+        toast.success(`File "${itemName}" deleted successfully`);
         // Remove from selection if deleted
         setSelectedFilePaths(prev => {
           const newSet = new Set(prev);
-          newSet.delete(selectedItem.path);
+          newSet.delete(itemPath);
           return newSet;
         });
       }
@@ -131,56 +138,76 @@ const RepositoryDetail: React.FC = () => {
       setSelectedItem(null);
       fetchFilesAndStatus(true); // Refresh data
     } catch (error) {
-      console.error("Error deleting item:", error);
-      toast.error(`Failed to delete ${selectedItem.is_directory ? 'folder' : 'file'}`);
+      console.error(`Error deleting ${isDirectory ? 'folder' : 'file'}:`, error);
+      toast.error(`Failed to delete ${isDirectory ? 'folder' : 'file'} "${itemName}"`);
     } finally {
       setIsDeleting(false);
     }
   };
 
+  // Handles multi-file deletion
+  const handleDeleteSelectedFiles = async () => {
+    if (!repositoryName || selectedFilePaths.size === 0) return;
+
+    setIsDeleting(true);
+    const pathsToDelete = Array.from(selectedFilePaths);
+    const numFiles = pathsToDelete.length;
+
+    try {
+      await deleteFiles(repositoryName, pathsToDelete);
+      toast.success(`${numFiles} file(s) deleted successfully`);
+      setIsMultiDeleteModalOpen(false);
+      setSelectedFilePaths(new Set()); // Clear selection
+      fetchFilesAndStatus(true); // Refresh data
+    } catch (error) {
+      console.error("Error deleting selected files:", error);
+      toast.error(`Failed to delete ${numFiles} selected file(s)`);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+
   const handleFileUpload = (files: File[]) => {
     setUploadedFiles(files);
   };
 
-  // This function is now only for handling the upload modal's "Process Files" button
-  // It uses the old processFile endpoint which uploads AND processes
-  const handleProcessUploadedFiles = async () => {
+  // This function now handles ONLY uploading the files
+  const handleUploadFiles = async () => {
     if (!repositoryName || uploadedFiles.length === 0) return;
 
-    setIsProcessingUpload(true);
+    setIsUploading(true);
     let successCount = 0;
     const totalFiles = uploadedFiles.length;
-    const toastId = toast.loading(`Processing 0/${totalFiles} uploaded files...`);
+    const toastId = toast.loading(`Uploading 0/${totalFiles} files...`);
 
     try {
-      // Note: This still uses the old endpoint that takes FormData
-      // If the backend supports processing uploaded files via the new endpoint, this needs adjustment.
       for (const [index, file] of uploadedFiles.entries()) {
         try {
-          // Assuming processFile uploads and processes
-          await processFile(repositoryName, file, currentPath);
+          // Use the new uploadFile endpoint
+          await uploadFile(repositoryName, file, currentPath);
           successCount++;
-          toast.loading(`Processing ${successCount}/${totalFiles} uploaded files...`, { id: toastId });
+          toast.loading(`Uploading ${successCount}/${totalFiles} files...`, { id: toastId });
         } catch (fileError) {
-           console.error(`Error processing uploaded file ${file.name}:`, fileError);
-           toast.error(`Failed to process ${file.name}`, { duration: 2000 });
+           console.error(`Error uploading file ${file.name}:`, fileError);
+           toast.error(`Failed to upload ${file.name}`, { duration: 2000 });
         }
       }
 
       if (successCount > 0) {
-         toast.success(`${successCount}/${totalFiles} files uploaded and processed successfully`, { id: toastId });
+         toast.success(`${successCount}/${totalFiles} files uploaded successfully`, { id: toastId });
       } else {
-         toast.error('No files were processed successfully', { id: toastId });
+         toast.error('No files were uploaded successfully', { id: toastId });
       }
 
       setIsUploadModalOpen(false);
       setUploadedFiles([]);
-      fetchFilesAndStatus(true); // Refresh data after processing
+      fetchFilesAndStatus(true); // Refresh data after uploading
     } catch (error) {
-      console.error("Error processing uploaded files:", error);
-      toast.error('An unexpected error occurred during upload processing', { id: toastId });
+      console.error("Error uploading files:", error);
+      toast.error('An unexpected error occurred during file upload', { id: toastId });
     } finally {
-      setIsProcessingUpload(false);
+      setIsUploading(false);
     }
   };
 
@@ -269,6 +296,10 @@ const RepositoryDetail: React.FC = () => {
     setIsDeleteModalOpen(true);
   };
 
+  const openMultiDeleteModal = () => {
+    setIsMultiDeleteModalOpen(true);
+  };
+
   const renderBreadcrumbs = () => {
     const pathParts = currentPath ? currentPath.split('/') : [];
     return (
@@ -326,18 +357,28 @@ const RepositoryDetail: React.FC = () => {
            {/* Process Selected Button */}
            <Button
             onClick={handleProcessSelectedFiles}
-            variant="primary" // Make it stand out
+            variant="primary"
             icon={<Play className="h-4 w-4" />}
             isLoading={isProcessingSelected}
-            disabled={selectedFilePaths.size === 0 || isProcessingSelected}
+            disabled={selectedFilePaths.size === 0 || isProcessingSelected || isDeleting || isUploading}
           >
             Process Selected ({selectedFilePaths.size})
+          </Button>
+          {/* Delete Selected Button */}
+          <Button
+            onClick={openMultiDeleteModal}
+            variant="danger"
+            icon={<Trash2 className="h-4 w-4" />}
+            disabled={selectedFilePaths.size === 0 || isProcessingSelected || isDeleting || isUploading}
+          >
+            Delete Selected ({selectedFilePaths.size})
           </Button>
           <Button
             onClick={() => fetchFilesAndStatus(true)}
             variant="secondary"
             icon={<RefreshCw className="h-4 w-4" />}
             isLoading={isRefreshing}
+            disabled={isDeleting || isProcessingSelected || isUploading}
           >
             Refresh
           </Button>
@@ -345,6 +386,7 @@ const RepositoryDetail: React.FC = () => {
             onClick={() => setIsCreateFolderModalOpen(true)}
             variant="secondary"
             icon={<FolderPlus className="h-4 w-4" />}
+            disabled={isDeleting || isProcessingSelected || isUploading}
           >
             New Folder
           </Button>
@@ -352,12 +394,14 @@ const RepositoryDetail: React.FC = () => {
             onClick={() => setIsUploadModalOpen(true)}
             variant="secondary"
             icon={<Upload className="h-4 w-4" />}
+            disabled={isDeleting || isProcessingSelected || isUploading}
           >
             Upload Files
           </Button>
           <Button
             onClick={() => setIsProcessingModalOpen(true)}
             isLoading={isProcessingDirectory}
+            disabled={isDeleting || isProcessingSelected || isUploading}
           >
             Process Directory
           </Button>
@@ -371,6 +415,7 @@ const RepositoryDetail: React.FC = () => {
             variant="outline"
             size="sm"
             icon={<ArrowLeft className="h-4 w-4" />}
+            disabled={isDeleting || isProcessingSelected || isUploading}
           >
              Up
           </Button>
@@ -405,7 +450,7 @@ const RepositoryDetail: React.FC = () => {
                           }
                         }}
                         onChange={toggleSelectAllFiles}
-                        disabled={files.filter(f => !f.is_directory).length === 0} // Disable if no files
+                        disabled={files.filter(f => !f.is_directory).length === 0 || isDeleting || isProcessingSelected || isUploading} // Disable if no files or busy
                       />
                     </div>
                   </th>
@@ -440,6 +485,7 @@ const RepositoryDetail: React.FC = () => {
                             className="h-4 w-4 rounded border-gray-600 text-white bg-gray-700 focus:ring-white focus:ring-offset-gray-900 cursor-pointer"
                             checked={selectedFilePaths.has(file.path)}
                             onChange={() => toggleFileSelection(file.path)}
+                            disabled={isDeleting || isProcessingSelected || isUploading} // Disable if busy
                           />
                         </div>
                       )}
@@ -457,6 +503,7 @@ const RepositoryDetail: React.FC = () => {
                               onClick={() => navigateToFolder(file.path)}
                               className="hover:text-blue-400 text-left truncate"
                               title={file.name}
+                              disabled={isDeleting || isProcessingSelected || isUploading} // Disable if busy
                             >
                               {file.name}
                             </button>
@@ -501,6 +548,7 @@ const RepositoryDetail: React.FC = () => {
                             variant="outline"
                             size="sm"
                             icon={<Download className="h-4 w-4" />}
+                            disabled={isDeleting || isProcessingSelected || isUploading} // Disable if busy
                           >
                             Download
                           </Button>
@@ -510,6 +558,7 @@ const RepositoryDetail: React.FC = () => {
                           variant="danger"
                           size="sm"
                           icon={<Trash2 className="h-4 w-4" />}
+                          disabled={isDeleting || isProcessingSelected || isUploading} // Disable if busy
                         >
                           Delete
                         </Button>
@@ -566,30 +615,30 @@ const RepositoryDetail: React.FC = () => {
       <Modal
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
-        title="Upload and Process Files"
+        title="Upload Files" // Updated title
         size="lg"
         footer={
           <div className="flex justify-end space-x-3">
             <Button
               variant="secondary"
               onClick={() => setIsUploadModalOpen(false)}
-              disabled={isProcessingUpload}
+              disabled={isUploading}
             >
               Cancel
             </Button>
             <Button
-              onClick={handleProcessUploadedFiles} // Use the specific handler for upload modal
-              isLoading={isProcessingUpload}
+              onClick={handleUploadFiles} // Use the specific handler for upload modal
+              isLoading={isUploading}
               disabled={uploadedFiles.length === 0}
             >
-              Upload & Process
+              Upload Files {/* Updated button text */}
             </Button>
           </div>
         }
       >
         <div className="space-y-4">
           <p className="text-sm text-gray-400">
-            Upload files to be processed and added to the repository. Supported file types include PDF, TXT, and DOCX. Files will be uploaded to the current directory (<span className="font-semibold text-white">{currentPath || 'root'}</span>) and then processed.
+            Upload files to the repository's file system. Files will be uploaded to the current directory (<span className="font-semibold text-white">{currentPath || 'root'}</span>). Note that uploading files here does NOT automatically process them into the vector database. Use the "Process Selected" or "Process Directory" buttons after uploading.
           </p>
 
           <FileUploader
@@ -654,7 +703,7 @@ const RepositoryDetail: React.FC = () => {
         </div>
       </Modal>
 
-      {/* Delete Confirmation Modal */}
+      {/* Single Delete Confirmation Modal */}
       <Modal
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
@@ -690,12 +739,58 @@ const RepositoryDetail: React.FC = () => {
             )}
              {!selectedItem?.is_directory && selectedItem?.isProcessed && (
               <span className="block mt-2 text-yellow-500">
-                Note: This file has been processed. Deleting it here only removes it from the repository view, not necessarily from the vector database unless the backend handles this cleanup.
+                Note: This file has been processed. Deleting it here removes it from the repository file system and associated vector data.
               </span>
             )}
           </p>
         </div>
       </Modal>
+
+      {/* Multi-Delete Confirmation Modal */}
+      <Modal
+        isOpen={isMultiDeleteModalOpen}
+        onClose={() => setIsMultiDeleteModalOpen(false)}
+        title={`Delete ${selectedFilePaths.size} Selected File(s)`}
+        size="md" // Slightly larger for list
+        footer={
+          <div className="flex justify-end space-x-3">
+            <Button
+              variant="secondary"
+              onClick={() => setIsMultiDeleteModalOpen(false)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleDeleteSelectedFiles}
+              isLoading={isDeleting}
+            >
+              Delete Selected
+            </Button>
+          </div>
+        }
+      >
+        <div>
+          <p className="text-sm text-gray-400 mb-3">
+            Are you sure you want to delete the following <span className="font-semibold text-white">{selectedFilePaths.size}</span> file(s)? This action cannot be undone and will remove associated vector data.
+          </p>
+          <div className="max-h-40 overflow-y-auto bg-gray-800 p-2 rounded border border-gray-700 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
+            <ul className="text-sm text-gray-300 space-y-1">
+              {Array.from(selectedFilePaths).map((path) => (
+                <li key={path} className="truncate flex items-center">
+                  <FileIcon className="h-4 w-4 mr-2 text-blue-400 flex-shrink-0" />
+                  {path.split('/').pop()} {/* Show only filename */}
+                </li>
+              ))}
+            </ul>
+          </div>
+           <p className="mt-3 text-sm text-yellow-500">
+             Note: Files that have been processed will be removed from the repository file system and their associated vector data will be deleted.
+           </p>
+        </div>
+      </Modal>
+
     </div>
   );
 };
