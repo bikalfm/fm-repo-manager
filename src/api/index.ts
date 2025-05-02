@@ -49,7 +49,33 @@ import axios from 'axios';
       const response = await api.get(`/repository/${repository}/list`, {
         params: { path }
       });
+      // console.log('API Response (listRepositoryFiles):', response.data); // Optional: Log file list data
       return response.data;
+    };
+
+    // New endpoint to get processed filenames
+    export const getProcessedFilenames = async (repository: string): Promise<string[]> => {
+      const api = createApiInstance();
+      try {
+        const response = await api.get(`/repository/${repository}/filenames`);
+        console.log(`API Response (getProcessedFilenames for ${repository}):`, response.data); // Log the raw response
+        // Adjust based on the actual API response structure.
+        // If it returns { filenames: [...] }
+        if (response.data && Array.isArray(response.data.filenames)) {
+          return response.data.filenames;
+        }
+        // If it returns just [...]
+        if (Array.isArray(response.data)) {
+          return response.data;
+        }
+        // Fallback for unexpected structure
+        console.warn('Unexpected response structure from /filenames endpoint:', response.data);
+        return [];
+      } catch (error) {
+        console.error(`Error fetching processed filenames for ${repository}:`, error);
+        // Re-throw or return empty array depending on desired error handling
+        throw error; // Re-throw to allow calling function to handle it
+      }
     };
 
     export const createFolder = async (repository: string, path: string): Promise<any> => {
@@ -77,6 +103,30 @@ import axios from 'axios';
     export const downloadFile = (repository: string, path: string): string => {
       return `${getApiUrl()}/repository/${repository}/file/download?path=${encodeURIComponent(path)}`;
     };
+
+    // Endpoint to process a file by its path (DEPRECATED - use processFilesByPath)
+    export const processFileByPath = async (repository: string, filePath: string, chunkSize: number = 2000, chunkOverlap: number = 200): Promise<any> => {
+      console.warn("processFileByPath is deprecated. Use processFilesByPath instead.");
+      const api = createApiInstance();
+      const response = await api.post(`/repository/${repository}/process-files`, { // Updated endpoint
+         file_paths: [filePath], // Send as a list
+         chunk_size: chunkSize,
+         chunk_overlap: chunkOverlap
+       });
+      return response.data;
+    };
+
+    // New endpoint to process multiple files by path
+    export const processFilesByPath = async (repository: string, filePaths: string[], chunkSize: number = 2000, chunkOverlap: number = 200): Promise<any> => {
+      const api = createApiInstance();
+      const response = await api.post(`/repository/${repository}/process-files`, {
+         file_paths: filePaths,
+         chunk_size: chunkSize,
+         chunk_overlap: chunkOverlap
+       });
+      return response.data;
+    };
+
 
     export const processFile = async (repository: string, file: File, path: string = '', chunkSize: number = 2000, chunkOverlap: number = 200): Promise<any> => {
       const api = createApiInstance();

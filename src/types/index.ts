@@ -15,6 +15,7 @@ export interface FileInfo {
   created_at: string;
   modified_at: string;
   content_type: string | null;
+  isProcessed?: boolean; // Added optional flag for processing status
 }
 
 export interface DocumentChunk {
