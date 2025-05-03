@@ -15,7 +15,8 @@ import {
 
 // Get API URL from localStorage if available, otherwise use environment variable or default
 const getApiUrl = () => {
-  return localStorage.getItem('apiUrl') || import.meta.env.VITE_API_URL || 'https://finalmoment-context-api-1022652397153.us-central1.run.app';
+  // Updated default API URL
+  return localStorage.getItem('apiUrl') || import.meta.env.VITE_API_URL || 'https://fm-context-api-v1-1022652397153.us-central1.run.app/';
 };
 
 // Create axios instance with dynamic baseURL

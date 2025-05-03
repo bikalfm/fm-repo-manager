@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Database, Search, HardDrive, FileText, Settings, Home, Menu, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
@@ -11,7 +11,11 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
+  // Initialize state from localStorage, default to false (expanded) if not found
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(() => {
+    const savedState = localStorage.getItem('sidebarCollapsed');
+    return savedState === 'true'; // localStorage stores strings, convert back to boolean
+  });
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: Home },
@@ -21,6 +25,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'Documents', href: '/documents', icon: FileText },
     { name: 'Settings', href: '/settings', icon: Settings },
   ];
+
+  // Effect to save state to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('sidebarCollapsed', String(isSidebarCollapsed));
+  }, [isSidebarCollapsed]);
 
   const isActive = (path: string) => {
     return location.pathname === path;
