@@ -10,7 +10,7 @@ import React, { useState, useEffect } from 'react';
     const Settings: React.FC = () => {
       const [healthStatus, setHealthStatus] = useState<'loading' | 'healthy' | 'unhealthy'>('loading');
       const [healthDetails, setHealthDetails] = useState<any>(null);
-      const [apiUrl, setApiUrl] = useState(localStorage.getItem('apiUrl') || import.meta.env.VITE_API_URL || 'https://fm-context-api-v1-1022652397153.us-central1.run.app/');
+      const [apiUrl, setApiUrl] = useState(localStorage.getItem('apiUrl') || import.meta.env.VITE_API_URL || 'https://fm-context-api-1022652397153.us-east1.run.app/');
       const [isUpdating, setIsUpdating] = useState(false);
       const [isChecking, setIsChecking] = useState(false); // State for check connection button
 
