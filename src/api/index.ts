@@ -13,10 +13,12 @@ import {
   DriveSyncResponse // Ensure this is imported
 } from '../types';
 
-// Get API URL from localStorage if available, otherwise use environment variable or default
+// Define the fixed API URL
+const FIXED_API_URL = 'https://fm-context-api-1022652397153.us-east1.run.app/';
+
+// Get API URL
 const getApiUrl = () => {
-  // Updated default API URL
-  return localStorage.getItem('apiUrl') || import.meta.env.VITE_API_URL || 'https://fm-context-api-1022652397153.us-east1.run.app/';
+  return FIXED_API_URL;
 };
 
 // Create axios instance with dynamic baseURL

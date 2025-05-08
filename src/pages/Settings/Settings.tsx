@@ -7,11 +7,11 @@ import React, { useState, useEffect } from 'react';
     import toast from 'react-hot-toast';
     import axios from 'axios'; // Import axios for temporary API instance creation
 
+    const FIXED_API_URL = 'https://fm-context-api-1022652397153.us-east1.run.app/';
+
     const Settings: React.FC = () => {
       const [healthStatus, setHealthStatus] = useState<'loading' | 'healthy' | 'unhealthy'>('loading');
       const [healthDetails, setHealthDetails] = useState<any>(null);
-      const [apiUrl, setApiUrl] = useState(localStorage.getItem('apiUrl') || import.meta.env.VITE_API_URL || 'https://fm-context-api-1022652397153.us-east1.run.app/');
-      const [isUpdating, setIsUpdating] = useState(false);
       const [isChecking, setIsChecking] = useState(false); // State for check connection button
 
       useEffect(() => {
@@ -24,8 +24,8 @@ import React, { useState, useEffect } from 'react';
         setHealthStatus('loading'); // Set main status to loading
         setHealthDetails(null); // Clear previous details
         try {
-          // Use the current value in the input field for the check
-          const tempApi = axios.create({ baseURL: apiUrl });
+          // Use the fixed API URL for the check
+          const tempApi = axios.create({ baseURL: FIXED_API_URL });
           const health = (await tempApi.get('/health')).data;
           setHealthStatus(health.status === 'healthy' ? 'healthy' : 'unhealthy');
           setHealthDetails(health);
@@ -36,31 +36,10 @@ import React, { useState, useEffect } from 'react';
           }
         } catch (error) {
           setHealthStatus('unhealthy');
-          toast.error(`Failed to connect to API at ${apiUrl}`);
+          toast.error(`Failed to connect to API at ${FIXED_API_URL}`);
         } finally {
           setIsChecking(false); // Stop loading for check button
         }
-      };
-
-      const handleUpdateApiUrl = () => {
-        setIsUpdating(true);
-
-        try {
-          // Store the API URL in localStorage
-          localStorage.setItem('apiUrl', apiUrl);
-
-          // Show success message
-          toast.success('API URL updated. Reloading application...');
-
-          // Reload the page after a short delay to allow the toast to be seen
-          setTimeout(() => {
-            window.location.href = '/'; // Navigate to root to force reload with new context
-          }, 1500);
-        } catch (error) {
-          toast.error('Failed to update API URL');
-          setIsUpdating(false);
-        }
-        // No finally block needed here as the page reloads
       };
 
       return (
@@ -122,22 +101,13 @@ import React, { useState, useEffect } from 'react';
                     <input
                       type="text"
                       id="api-url"
-                      value={apiUrl}
-                      onChange={(e) => setApiUrl(e.target.value)}
-                      className="flex-1 block w-full border border-gray-700 rounded-l-md shadow-sm py-2 px-3 bg-gray-800 text-white focus:outline-none focus:ring-white focus:border-white sm:text-sm"
-                      placeholder="http://localhost:3001"
-                      disabled={isUpdating} // Disable input while updating
+                      value={FIXED_API_URL}
+                      readOnly // Make the input uneditable
+                      className="flex-1 block w-full border border-gray-700 rounded-md shadow-sm py-2 px-3 bg-gray-700 text-gray-300 focus:outline-none sm:text-sm cursor-not-allowed" // Adjusted styling for readonly
                     />
-                    <Button
-                      onClick={handleUpdateApiUrl}
-                      className="rounded-l-none"
-                      isLoading={isUpdating} // Use isLoading prop
-                    >
-                      Update
-                    </Button>
                   </div>
                   <p className="mt-1 text-xs text-gray-400">
-                    Changes will take effect after page reload. Make sure the API is running at the specified URL.
+                    The API URL is configured globally and cannot be changed here.
                   </p>
                 </div>
               </div>
@@ -216,7 +186,7 @@ import React, { useState, useEffect } from 'react';
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => window.open(healthDetails?.vector_db_url || 'http://localhost:6333/dashboard', '_blank')} // Append /dashboard
+                      onClick={() => window.open(healthDetails?.vector_db_url ? `${healthDetails.vector_db_url.replace(/\/$/, '')}/dashboard` : 'http://localhost:6333/dashboard', '_blank')} // Append /dashboard safely
                       disabled={!healthDetails?.vector_db_url} // Disable if URL not available
                     >
                       Qdrant Dashboard
