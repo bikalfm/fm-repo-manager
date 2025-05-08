@@ -104,7 +104,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       </div>
 
       {/* Static sidebar for desktop */}
-      <div className={`hidden lg:flex ${sidebarWidthClass} lg:flex-col lg:fixed lg:inset-y-0 transition-width duration-300 ease-in-out`}>
+      <div className={`hidden lg:flex ${sidebarWidthClass} lg:flex-col lg:fixed lg:inset-y-0 transition-width duration-300 ease-in-out z-30`}> {/* Added z-30 to sidebar */}
         <div className="flex-1 flex flex-col min-h-0 border-r border-gray-700 bg-black">
           {/* Top section: Logo and Collapse Button */}
           <div className={`flex items-center flex-shrink-0 px-4 pt-5 pb-4 relative ${isSidebarCollapsed ? 'justify-center' : ''}`}>
@@ -157,7 +157,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* Main content */}
       <div className={`${mainContentPaddingClass} flex flex-col flex-1 transition-padding duration-300 ease-in-out`}>
         {/* Mobile Header */}
-        <div className="sticky top-0 z-10 lg:hidden pl-1 pt-1 sm:pl-3 sm:pt-3 bg-black shadow-md shadow-gray-800">
+        <div className="sticky top-0 z-20 lg:hidden pl-1 pt-1 sm:pl-3 sm:pt-3 bg-black shadow-md shadow-gray-800"> {/* Ensure mobile header z-index is appropriate */}
           <button
             type="button"
             className="-ml-0.5 -mt-0.5 h-12 w-12 inline-flex items-center justify-center rounded-md text-gray-300 hover:text-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
@@ -168,8 +168,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </button>
         </div>
         {/* Content Area */}
-        <main className="flex-1 overflow-hidden">
-          <div className="py-6 px-4 sm:px-6 lg:px-8 max-w-full overflow-x-auto">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden"> {/* MODIFIED: Changed overflow-hidden to overflow-y-auto overflow-x-hidden */}
+          <div className="py-6 px-4 sm:px-6 lg:px-8 max-w-full"> {/* Removed overflow-x-auto from here */}
             {children}
           </div>
         </main>

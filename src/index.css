@@ -18,6 +18,39 @@ body {
   overflow-x: hidden;
 }
 
+/* Global Scrollbar Styles */
+
+/* For Webkit-based browsers (Chrome, Safari, Edge, Opera) */
+::-webkit-scrollbar {
+  width: 6px; /* Width of vertical scrollbar */
+  height: 6px; /* Height of horizontal scrollbar */
+}
+
+::-webkit-scrollbar-track {
+  background: var(--card); /* Dark track, consistent with card backgrounds */
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2); /* Faded white - slightly more subtle */
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.4); /* More opaque on hover */
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent; /* For the corner when both scrollbars are visible */
+}
+
+/* For Firefox */
+html { /* Apply to html for global effect */
+  scrollbar-width: thin; /* Options: "auto", "thin", "none" */
+  scrollbar-color: rgba(255, 255, 255, 0.2) var(--card); /* thumb color, track color */
+}
+
+
 /* Custom utility classes */
 .bg-inverted {
   background-color: var(--foreground);
@@ -32,32 +65,13 @@ body {
   border-color: var(--foreground);
 }
 
-/* Custom scrollbar for webkit browsers */
-.scrollbar-thin::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
-}
-
-.scrollbar-thin::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 2px;
-}
-
-.scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: var(--muted);
-}
-
 /* Responsive table adjustments */
 @media (max-width: 640px) {
   .table-responsive {
     display: block;
     width: 100%;
     overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
   }
 }
 

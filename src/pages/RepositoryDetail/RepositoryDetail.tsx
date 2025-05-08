@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FolderPlus, Upload, Trash2, Download, RefreshCw, File as FileIcon, Folder as FolderIcon, ArrowLeft, CheckCircle, Play, Square, CheckSquare } from 'lucide-react';
+import { FolderPlus, Upload, Trash2, Download, RefreshCw, File as FileIcon, Folder as FolderIcon, ArrowLeft, CheckCircle, Play, Square, CheckSquare, Eye } from 'lucide-react'; // Added Eye icon
 import Card from '../../components/Card';
 import Button from '../../components/Button';
 import Modal from '../../components/Modal';
 import FileUploader from '../../components/FileUploader';
 import EmptyState from '../../components/EmptyState';
 import Spinner from '../../components/Spinner';
-import { listRepositoryFiles, createFolder, deleteFolder, deleteFiles, downloadFile, processDirectory, getProcessedFilenames, processFilesByPath, uploadFile } from '../../api'; // Updated API import: deleteFile -> deleteFiles, added uploadFile, removed processFile
+import FileViewerModal from '../../components/FileViewerModal'; // Import FileViewerModal
+import { listRepositoryFiles, createFolder, deleteFolder, deleteFiles, downloadFile, processDirectory, getProcessedFilenames, processFilesByPath, uploadFile } from '../../api';
 import { FileInfo } from '../../types';
 import toast from 'react-hot-toast';
 
@@ -20,22 +21,27 @@ const RepositoryDetail: React.FC = () => {
   const [currentPath, setCurrentPath] = useState(path || '');
   const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false); // For single item delete
-  const [isMultiDeleteModalOpen, setIsMultiDeleteModalOpen] = useState(false); // For multi item delete
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isMultiDeleteModalOpen, setIsMultiDeleteModalOpen] = useState(false);
   const [isProcessingModalOpen, setIsProcessingModalOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
-  const [selectedItem, setSelectedItem] = useState<FileInfo | null>(null); // For single delete target
+  const [selectedItem, setSelectedItem] = useState<FileInfo | null>(null);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false); // Used for both single and multi delete
-  const [isUploading, setIsUploading] = useState(false); // For upload modal uploading
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [isProcessingDirectory, setIsProcessingDirectory] = useState(false);
-  const [isProcessingSelected, setIsProcessingSelected] = useState(false); // For selected files processing
+  const [isProcessingSelected, setIsProcessingSelected] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const [selectedFilePaths, setSelectedFilePaths] = useState<Set<string>>(new Set()); // State for selected file paths
+  const [selectedFilePaths, setSelectedFilePaths] = useState<Set<string>>(new Set());
+
+  // State for FileViewerModal
+  const [isFileViewerOpen, setIsFileViewerOpen] = useState(false);
+  const [selectedFileForViewer, setSelectedFileForViewer] = useState<FileInfo | null>(null);
+
 
   useEffect(() => {
     setCurrentPath(path || '');
-    setSelectedFilePaths(new Set()); // Reset selection on path change
+    setSelectedFilePaths(new Set()); 
   }, [path]);
 
   useEffect(() => {
@@ -54,28 +60,18 @@ const RepositoryDetail: React.FC = () => {
       setLoading(true);
     }
     try {
-      console.log(`Fetching data for repo: ${repositoryName}, path: '${currentPath}'`);
       const [filesData, processedNamesData] = await Promise.all([
         listRepositoryFiles(repositoryName, currentPath),
         getProcessedFilenames(repositoryName)
       ]);
 
-      console.log('Received filesData:', filesData);
-      console.log('Received processedNamesData:', processedNamesData);
-
       const processedSet = new Set(processedNamesData);
-      console.log('Created processedSet:', processedSet);
-
       const filesWithStatus = filesData.map(file => ({
         ...file,
         isProcessed: !file.is_directory && processedSet.has(file.path)
       }));
 
-      console.log('Mapped filesWithStatus:', filesWithStatus);
       setFiles(filesWithStatus);
-      // Don't reset selection on refresh, only on path change
-      // setSelectedFilePaths(new Set());
-
     } catch (error) {
       console.error("Error fetching files or status:", error);
       toast.error('Failed to fetch repository data. Check console for details.');
@@ -90,18 +86,16 @@ const RepositoryDetail: React.FC = () => {
 
   const handleCreateFolder = async () => {
     if (!repositoryName || !newFolderName.trim()) return;
-
     setIsCreatingFolder(true);
     try {
       const folderPath = currentPath
         ? `${currentPath}/${newFolderName.trim()}`
         : newFolderName.trim();
-
       await createFolder(repositoryName, folderPath);
       toast.success(`Folder "${newFolderName}" created successfully`);
       setIsCreateFolderModalOpen(false);
       setNewFolderName('');
-      fetchFilesAndStatus(true); // Refresh data
+      fetchFilesAndStatus(true);
     } catch (error) {
       console.error("Error creating folder:", error);
       toast.error('Failed to create folder');
@@ -110,24 +104,19 @@ const RepositoryDetail: React.FC = () => {
     }
   };
 
-  // Handles single item deletion (both files and folders)
   const handleDeleteItem = async () => {
     if (!repositoryName || !selectedItem) return;
-
     setIsDeleting(true);
-    const itemName = selectedItem.name; // Store name before closing modal
+    const itemName = selectedItem.name;
     const itemPath = selectedItem.path;
     const isDirectory = selectedItem.is_directory;
-
     try {
       if (isDirectory) {
         await deleteFolder(repositoryName, itemPath);
         toast.success(`Folder "${itemName}" deleted successfully`);
       } else {
-        // Use the new deleteFiles endpoint for single file deletion
         await deleteFiles(repositoryName, [itemPath]);
         toast.success(`File "${itemName}" deleted successfully`);
-        // Remove from selection if deleted
         setSelectedFilePaths(prev => {
           const newSet = new Set(prev);
           newSet.delete(itemPath);
@@ -136,7 +125,7 @@ const RepositoryDetail: React.FC = () => {
       }
       setIsDeleteModalOpen(false);
       setSelectedItem(null);
-      fetchFilesAndStatus(true); // Refresh data
+      fetchFilesAndStatus(true);
     } catch (error) {
       console.error(`Error deleting ${isDirectory ? 'folder' : 'file'}:`, error);
       toast.error(`Failed to delete ${isDirectory ? 'folder' : 'file'} "${itemName}"`);
@@ -145,20 +134,17 @@ const RepositoryDetail: React.FC = () => {
     }
   };
 
-  // Handles multi-file deletion
   const handleDeleteSelectedFiles = async () => {
     if (!repositoryName || selectedFilePaths.size === 0) return;
-
     setIsDeleting(true);
     const pathsToDelete = Array.from(selectedFilePaths);
     const numFiles = pathsToDelete.length;
-
     try {
       await deleteFiles(repositoryName, pathsToDelete);
       toast.success(`${numFiles} file(s) deleted successfully`);
       setIsMultiDeleteModalOpen(false);
-      setSelectedFilePaths(new Set()); // Clear selection
-      fetchFilesAndStatus(true); // Refresh data
+      setSelectedFilePaths(new Set());
+      fetchFilesAndStatus(true);
     } catch (error) {
       console.error("Error deleting selected files:", error);
       toast.error(`Failed to delete ${numFiles} selected file(s)`);
@@ -167,24 +153,19 @@ const RepositoryDetail: React.FC = () => {
     }
   };
 
-
   const handleFileUpload = (files: File[]) => {
     setUploadedFiles(files);
   };
 
-  // This function now handles ONLY uploading the files
   const handleUploadFiles = async () => {
     if (!repositoryName || uploadedFiles.length === 0) return;
-
     setIsUploading(true);
     let successCount = 0;
     const totalFiles = uploadedFiles.length;
     const toastId = toast.loading(`Uploading 0/${totalFiles} files...`);
-
     try {
       for (const [index, file] of uploadedFiles.entries()) {
         try {
-          // Use the new uploadFile endpoint
           await uploadFile(repositoryName, file, currentPath);
           successCount++;
           toast.loading(`Uploading ${successCount}/${totalFiles} files...`, { id: toastId });
@@ -193,16 +174,14 @@ const RepositoryDetail: React.FC = () => {
            toast.error(`Failed to upload ${file.name}`, { duration: 2000 });
         }
       }
-
       if (successCount > 0) {
          toast.success(`${successCount}/${totalFiles} files uploaded successfully`, { id: toastId });
       } else {
          toast.error('No files were uploaded successfully', { id: toastId });
       }
-
       setIsUploadModalOpen(false);
       setUploadedFiles([]);
-      fetchFilesAndStatus(true); // Refresh data after uploading
+      fetchFilesAndStatus(true);
     } catch (error) {
       console.error("Error uploading files:", error);
       toast.error('An unexpected error occurred during file upload', { id: toastId });
@@ -213,7 +192,6 @@ const RepositoryDetail: React.FC = () => {
 
   const handleProcessDirectory = async () => {
     if (!repositoryName) return;
-
     setIsProcessingDirectory(true);
     const toastId = toast.loading(`Starting processing for directory: ${currentPath || 'root'}...`);
     try {
@@ -229,19 +207,15 @@ const RepositoryDetail: React.FC = () => {
     }
   };
 
-  // New function to process selected files using the new endpoint
   const handleProcessSelectedFiles = async () => {
     if (!repositoryName || selectedFilePaths.size === 0) return;
-
     setIsProcessingSelected(true);
     const pathsToProcess = Array.from(selectedFilePaths);
     const toastId = toast.loading(`Processing ${pathsToProcess.length} selected file(s)...`);
-
     try {
       await processFilesByPath(repositoryName, pathsToProcess);
       toast.success(`${pathsToProcess.length} file(s) sent for processing successfully. Refresh to see status updates.`, { id: toastId, duration: 5000 });
-      setSelectedFilePaths(new Set()); // Clear selection after successful processing
-      // Optionally trigger a delayed refresh
+      setSelectedFilePaths(new Set());
       setTimeout(() => fetchFilesAndStatus(true), 5000);
     } catch (error) {
       console.error("Error processing selected files:", error);
@@ -266,10 +240,8 @@ const RepositoryDetail: React.FC = () => {
   const toggleSelectAllFiles = () => {
     const allFilePathsInView = files.filter(f => !f.is_directory).map(f => f.path);
     if (selectedFilePaths.size === allFilePathsInView.length) {
-      // Deselect all
       setSelectedFilePaths(new Set());
     } else {
-      // Select all
       setSelectedFilePaths(new Set(allFilePathsInView));
     }
   };
@@ -286,7 +258,7 @@ const RepositoryDetail: React.FC = () => {
     navigate(`/repositories/${repositoryName}${newPath ? `/${newPath}` : ''}`);
   };
 
-  const handleDownload = (file: FileInfo) => {
+  const handleDownloadFile = (file: FileInfo) => {
     if (!repositoryName) return;
     window.open(downloadFile(repositoryName, file.path), '_blank');
   };
@@ -298,6 +270,14 @@ const RepositoryDetail: React.FC = () => {
 
   const openMultiDeleteModal = () => {
     setIsMultiDeleteModalOpen(true);
+  };
+
+  // Function to open file viewer
+  const handleViewFile = (file: FileInfo) => {
+    if (!file.is_directory && repositoryName) {
+      setSelectedFileForViewer(file);
+      setIsFileViewerOpen(true);
+    }
   };
 
   const renderBreadcrumbs = () => {
@@ -354,7 +334,6 @@ const RepositoryDetail: React.FC = () => {
           </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2 md:mt-0 md:ml-4">
-           {/* Process Selected Button */}
            <Button
             onClick={handleProcessSelectedFiles}
             variant="primary"
@@ -364,7 +343,6 @@ const RepositoryDetail: React.FC = () => {
           >
             Process Selected ({selectedFilePaths.size})
           </Button>
-          {/* Delete Selected Button */}
           <Button
             onClick={openMultiDeleteModal}
             variant="danger"
@@ -438,19 +416,19 @@ const RepositoryDetail: React.FC = () => {
             <table className="min-w-full divide-y divide-gray-700">
               <thead className="bg-gray-800">
                 <tr>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider w-10"> {/* Checkbox column */}
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider w-10">
                     <div className="flex items-center justify-center">
                       <input
                         type="checkbox"
                         className="h-4 w-4 rounded border-gray-600 text-white bg-gray-700 focus:ring-white focus:ring-offset-gray-800 cursor-pointer"
                         checked={allFilesSelected}
-                        ref={input => { // Indeterminate state handling
+                        ref={input => { 
                           if (input) {
                             input.indeterminate = someFilesSelected;
                           }
                         }}
                         onChange={toggleSelectAllFiles}
-                        disabled={files.filter(f => !f.is_directory).length === 0 || isDeleting || isProcessingSelected || isUploading} // Disable if no files or busy
+                        disabled={files.filter(f => !f.is_directory).length === 0 || isDeleting || isProcessingSelected || isUploading}
                       />
                     </div>
                   </th>
@@ -477,7 +455,7 @@ const RepositoryDetail: React.FC = () => {
               <tbody className="bg-gray-900 divide-y divide-gray-700">
                 {files.map((file) => (
                   <tr key={file.path} className={`hover:bg-gray-800 ${selectedFilePaths.has(file.path) ? 'bg-gray-800/50' : ''}`}>
-                     <td className="px-4 py-4 whitespace-nowrap"> {/* Checkbox cell */}
+                     <td className="px-4 py-4 whitespace-nowrap">
                       {!file.is_directory && (
                         <div className="flex items-center justify-center">
                           <input
@@ -485,7 +463,7 @@ const RepositoryDetail: React.FC = () => {
                             className="h-4 w-4 rounded border-gray-600 text-white bg-gray-700 focus:ring-white focus:ring-offset-gray-900 cursor-pointer"
                             checked={selectedFilePaths.has(file.path)}
                             onChange={() => toggleFileSelection(file.path)}
-                            disabled={isDeleting || isProcessingSelected || isUploading} // Disable if busy
+                            disabled={isDeleting || isProcessingSelected || isUploading}
                           />
                         </div>
                       )}
@@ -503,12 +481,15 @@ const RepositoryDetail: React.FC = () => {
                               onClick={() => navigateToFolder(file.path)}
                               className="hover:text-blue-400 text-left truncate"
                               title={file.name}
-                              disabled={isDeleting || isProcessingSelected || isUploading} // Disable if busy
+                              disabled={isDeleting || isProcessingSelected || isUploading}
                             >
                               {file.name}
                             </button>
                           ) : (
-                            file.name
+                            // Make file name clickable for viewing as well, or rely on action button
+                            <span className="cursor-pointer hover:text-blue-400" onClick={() => handleViewFile(file)}>
+                              {file.name}
+                            </span>
                           )}
                         </div>
                       </div>
@@ -541,24 +522,37 @@ const RepositoryDetail: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end space-x-2">
-                         {/* Removed individual Process button */}
                         {!file.is_directory && (
-                          <Button
-                            onClick={() => handleDownload(file)}
-                            variant="outline"
-                            size="sm"
-                            icon={<Download className="h-4 w-4" />}
-                            disabled={isDeleting || isProcessingSelected || isUploading} // Disable if busy
-                          >
-                            Download
-                          </Button>
+                          <>
+                            <Button
+                              onClick={() => handleViewFile(file)}
+                              variant="outline"
+                              size="sm"
+                              icon={<Eye className="h-4 w-4" />}
+                              disabled={isDeleting || isProcessingSelected || isUploading}
+                              title="View File"
+                            >
+                              View
+                            </Button>
+                            <Button
+                              onClick={() => handleDownloadFile(file)}
+                              variant="outline"
+                              size="sm"
+                              icon={<Download className="h-4 w-4" />}
+                              disabled={isDeleting || isProcessingSelected || isUploading}
+                              title="Download File"
+                            >
+                              Download
+                            </Button>
+                          </>
                         )}
                         <Button
                           onClick={() => openDeleteModal(file)}
                           variant="danger"
                           size="sm"
                           icon={<Trash2 className="h-4 w-4" />}
-                          disabled={isDeleting || isProcessingSelected || isUploading} // Disable if busy
+                          disabled={isDeleting || isProcessingSelected || isUploading}
+                          title={file.is_directory ? "Delete Folder" : "Delete File"}
                         >
                           Delete
                         </Button>
@@ -615,7 +609,7 @@ const RepositoryDetail: React.FC = () => {
       <Modal
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
-        title="Upload Files" // Updated title
+        title="Upload Files"
         size="lg"
         footer={
           <div className="flex justify-end space-x-3">
@@ -627,11 +621,11 @@ const RepositoryDetail: React.FC = () => {
               Cancel
             </Button>
             <Button
-              onClick={handleUploadFiles} // Use the specific handler for upload modal
+              onClick={handleUploadFiles}
               isLoading={isUploading}
               disabled={uploadedFiles.length === 0}
             >
-              Upload Files {/* Updated button text */}
+              Upload Files
             </Button>
           </div>
         }
@@ -640,7 +634,6 @@ const RepositoryDetail: React.FC = () => {
           <p className="text-sm text-gray-400">
             Upload files to the repository's file system. Files will be uploaded to the current directory (<span className="font-semibold text-white">{currentPath || 'root'}</span>). Note that uploading files here does NOT automatically process them into the vector database. Use the "Process Selected" or "Process Directory" buttons after uploading.
           </p>
-
           <FileUploader
             onFilesSelected={handleFileUpload}
             multiple={true}
@@ -649,8 +642,8 @@ const RepositoryDetail: React.FC = () => {
               'text/plain': ['.txt'],
               'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx']
             }}
+            maxSize={100 * 1024 * 1024} // 100MB in bytes
           />
-
           {uploadedFiles.length > 0 && (
             <div>
               <h4 className="text-sm font-medium text-white mb-2">Selected Files:</h4>
@@ -731,7 +724,6 @@ const RepositoryDetail: React.FC = () => {
         <div>
           <p className="text-sm text-gray-400">
             Are you sure you want to delete {selectedItem?.is_directory ? 'folder' : 'file'} <span className="font-semibold text-white">{selectedItem?.name}</span>? This action cannot be undone.
-
             {selectedItem?.is_directory && (
               <span className="block mt-2 text-red-500">
                 Warning: This will delete all files and subfolders within this folder.
@@ -751,7 +743,7 @@ const RepositoryDetail: React.FC = () => {
         isOpen={isMultiDeleteModalOpen}
         onClose={() => setIsMultiDeleteModalOpen(false)}
         title={`Delete ${selectedFilePaths.size} Selected File(s)`}
-        size="md" // Slightly larger for list
+        size="md"
         footer={
           <div className="flex justify-end space-x-3">
             <Button
@@ -780,7 +772,7 @@ const RepositoryDetail: React.FC = () => {
               {Array.from(selectedFilePaths).map((path) => (
                 <li key={path} className="truncate flex items-center">
                   <FileIcon className="h-4 w-4 mr-2 text-blue-400 flex-shrink-0" />
-                  {path.split('/').pop()} {/* Show only filename */}
+                  {path.split('/').pop()}
                 </li>
               ))}
             </ul>
@@ -791,18 +783,23 @@ const RepositoryDetail: React.FC = () => {
         </div>
       </Modal>
 
+      {/* File Viewer Modal */}
+      <FileViewerModal
+        isOpen={isFileViewerOpen}
+        onClose={() => setIsFileViewerOpen(false)}
+        fileInfo={selectedFileForViewer}
+        repositoryName={repositoryName || null}
+      />
+
     </div>
   );
 };
 
-// Helper function to format file size
 const formatFileSize = (bytes: number): string => {
   if (bytes === 0) return '0 Bytes';
-
   const k = 1024;
   const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 

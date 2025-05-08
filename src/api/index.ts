@@ -127,6 +127,18 @@ export const downloadFile = (repository: string, path: string): string => {
   return `${getApiUrl()}/repository/${repository}/file/download?path=${encodeURIComponent(path)}`;
 };
 
+// New function to get file content as Blob
+export const getFileBlob = async (repository: string, path: string): Promise<Blob> => {
+  const url = downloadFile(repository, path); // This generates the full URL
+  const response = await fetch(url);
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`Failed to fetch file blob: ${response.status} ${response.statusText}`, errorText);
+    throw new Error(`Failed to fetch file: ${response.statusText}. Server said: ${errorText.substring(0,100)}`);
+  }
+  return response.blob();
+};
+
 // Endpoint to process a file by its path (DEPRECATED - use processFilesByPath)
 export const processFileByPath = async (repository: string, filePath: string, chunkSize: number = 2000, chunkOverlap: number = 200): Promise<any> => {
   console.warn("processFileByPath is deprecated. Use processFilesByPath instead.");

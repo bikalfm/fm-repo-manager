@@ -5,6 +5,8 @@ export interface Repository {
   created?: boolean;
   message?: string;
   embedding_dimension?: number;
+  chunk_size?: number;      // Added for consistency if backend returns it
+  chunk_overlap?: number;   // Added for consistency if backend returns it
 }
 
 export interface FileInfo {
@@ -103,6 +105,8 @@ export interface RepositoryCreateRequest {
   name: string;
   description?: string;
   embedding_dimension?: number;
+  chunk_size?: number;
+  chunk_overlap?: number;
 }
 
 export interface DriveProcessingRequest {

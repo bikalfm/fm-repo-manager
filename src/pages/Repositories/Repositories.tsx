@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, FolderPlus, RefreshCw } from 'lucide-react';
-import { useNavigate } from 'react-router-dom'; // Import useNavigate
+import { useNavigate } from 'react-router-dom';
 import Card from '../../components/Card';
 import Button from '../../components/Button';
 import Modal from '../../components/Modal';
@@ -9,8 +9,12 @@ import Spinner from '../../components/Spinner';
 import { getRepositories, createRepository, deleteRepository } from '../../api';
 import toast from 'react-hot-toast';
 
+const DEFAULT_EMBEDDING_DIMENSION = 1536;
+const DEFAULT_CHUNK_SIZE = 2000;
+const DEFAULT_CHUNK_OVERLAP = 200;
+
 const Repositories: React.FC = () => {
-  const navigate = useNavigate(); // Initialize useNavigate
+  const navigate = useNavigate();
   const [repositories, setRepositories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -19,6 +23,9 @@ const Repositories: React.FC = () => {
   const [selectedRepo, setSelectedRepo] = useState('');
   const [newRepoName, setNewRepoName] = useState('');
   const [newRepoDescription, setNewRepoDescription] = useState('');
+  const [newRepoEmbeddingDimension, setNewRepoEmbeddingDimension] = useState<number | string>(DEFAULT_EMBEDDING_DIMENSION);
+  const [newRepoChunkSize, setNewRepoChunkSize] = useState<number | string>(DEFAULT_CHUNK_SIZE);
+  const [newRepoChunkOverlap, setNewRepoChunkOverlap] = useState<number | string>(DEFAULT_CHUNK_OVERLAP);
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -51,17 +58,44 @@ const Repositories: React.FC = () => {
       toast.error('Repository name is required');
       return;
     }
+    const embeddingDimension = Number(newRepoEmbeddingDimension);
+    const chunkSize = Number(newRepoChunkSize);
+    const chunkOverlap = Number(newRepoChunkOverlap);
+
+    if (isNaN(embeddingDimension) || embeddingDimension <= 0) {
+      toast.error('Embedding dimension must be a positive number.');
+      return;
+    }
+    if (isNaN(chunkSize) || chunkSize <= 0) {
+      toast.error('Chunk size must be a positive number.');
+      return;
+    }
+    if (isNaN(chunkOverlap) || chunkOverlap < 0) {
+      toast.error('Chunk overlap must be a non-negative number.');
+      return;
+    }
+    if (chunkOverlap >= chunkSize) {
+      toast.error('Chunk overlap must be less than chunk size.');
+      return;
+    }
+
 
     setIsCreating(true);
     try {
       await createRepository({
         name: newRepoName.trim(),
-        description: newRepoDescription.trim() || undefined
+        description: newRepoDescription.trim() || undefined,
+        embedding_dimension: embeddingDimension,
+        chunk_size: chunkSize,
+        chunk_overlap: chunkOverlap,
       });
       toast.success(`Repository "${newRepoName}" created successfully`);
       setIsCreateModalOpen(false);
       setNewRepoName('');
       setNewRepoDescription('');
+      setNewRepoEmbeddingDimension(DEFAULT_EMBEDDING_DIMENSION);
+      setNewRepoChunkSize(DEFAULT_CHUNK_SIZE);
+      setNewRepoChunkOverlap(DEFAULT_CHUNK_OVERLAP);
       fetchRepositories(true); // Refresh after creating
     } catch (error) {
       toast.error('Failed to create repository');
@@ -90,7 +124,6 @@ const Repositories: React.FC = () => {
     setIsDeleteModalOpen(true);
   };
 
-  // New function to handle card click navigation
   const handleCardClick = (repoName: string) => {
     navigate(`/repositories/${repoName}`);
   };
@@ -134,20 +167,18 @@ const Repositories: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {repositories.map((repo) => (
-            // Wrap card content in a clickable div
             <Card key={repo} className="hover:shadow-lg hover:shadow-gray-700 transition-shadow cursor-pointer">
-              <div onClick={() => handleCardClick(repo)}> {/* Add onClick handler here */}
+              <div onClick={() => handleCardClick(repo)}>
                 <div className="flex justify-between items-start">
                   <div>
                     <h3 className="text-lg font-medium text-white mb-1">{repo}</h3>
                     <p className="text-sm text-gray-400">Repository</p>
                   </div>
-                  {/* Prevent click propagation for the delete button */}
                   <Button
                     variant="danger"
                     size="sm"
                     onClick={(e) => {
-                      e.stopPropagation(); // Stop click from bubbling up to the card div
+                      e.stopPropagation();
                       openDeleteModal(repo);
                     }}
                     icon={<Trash2 className="h-4 w-4" />}
@@ -155,15 +186,13 @@ const Repositories: React.FC = () => {
                     Delete
                   </Button>
                 </div>
-                {/* Keep other buttons if needed, but primary navigation is now the card click */}
                 <div className="mt-4 flex justify-between">
-                   {/* Example: You could remove these if card click is sufficient */}
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={(e) => {
-                       e.stopPropagation(); // Stop click from bubbling up
-                       handleCardClick(repo); // Still navigate to view files
+                       e.stopPropagation();
+                       handleCardClick(repo);
                     }}
                   >
                     View Files
@@ -172,8 +201,8 @@ const Repositories: React.FC = () => {
                     variant="outline"
                     size="sm"
                      onClick={(e) => {
-                       e.stopPropagation(); // Stop click from bubbling up
-                       navigate(`/search?repository=${repo}`); // Navigate to search
+                       e.stopPropagation();
+                       navigate(`/search?repository=${repo}`);
                     }}
                   >
                     Search
@@ -190,6 +219,7 @@ const Repositories: React.FC = () => {
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         title="Create New Repository"
+        size="lg" // Increased size for more fields
         footer={
           <div className="flex justify-end space-x-3">
             <Button
@@ -208,7 +238,7 @@ const Repositories: React.FC = () => {
           </div>
         }
       >
-        <div className="space-y-4">
+        <div className="space-y-6">
           <div>
             <label htmlFor="repo-name" className="block text-sm font-medium text-white">
               Repository Name
@@ -237,6 +267,50 @@ const Repositories: React.FC = () => {
               className="mt-1 block w-full border border-gray-700 rounded-md shadow-sm py-2 px-3 bg-gray-800 text-white focus:outline-none focus:ring-white focus:border-white sm:text-sm"
               placeholder="Brief description of this repository's purpose"
             />
+          </div>
+          <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-3">
+            <div>
+              <label htmlFor="repo-embedding-dimension" className="block text-sm font-medium text-white">
+                Embedding Dimension
+              </label>
+              <input
+                type="number"
+                id="repo-embedding-dimension"
+                value={newRepoEmbeddingDimension}
+                onChange={(e) => setNewRepoEmbeddingDimension(e.target.value)}
+                className="mt-1 block w-full border border-gray-700 rounded-md shadow-sm py-2 px-3 bg-gray-800 text-white focus:outline-none focus:ring-white focus:border-white sm:text-sm"
+                placeholder={String(DEFAULT_EMBEDDING_DIMENSION)}
+              />
+              <p className="mt-1 text-xs text-gray-400">Default: {DEFAULT_EMBEDDING_DIMENSION}</p>
+            </div>
+            <div>
+              <label htmlFor="repo-chunk-size" className="block text-sm font-medium text-white">
+                Chunk Size
+              </label>
+              <input
+                type="number"
+                id="repo-chunk-size"
+                value={newRepoChunkSize}
+                onChange={(e) => setNewRepoChunkSize(e.target.value)}
+                className="mt-1 block w-full border border-gray-700 rounded-md shadow-sm py-2 px-3 bg-gray-800 text-white focus:outline-none focus:ring-white focus:border-white sm:text-sm"
+                placeholder={String(DEFAULT_CHUNK_SIZE)}
+              />
+              <p className="mt-1 text-xs text-gray-400">Default: {DEFAULT_CHUNK_SIZE}</p>
+            </div>
+            <div>
+              <label htmlFor="repo-chunk-overlap" className="block text-sm font-medium text-white">
+                Chunk Overlap
+              </label>
+              <input
+                type="number"
+                id="repo-chunk-overlap"
+                value={newRepoChunkOverlap}
+                onChange={(e) => setNewRepoChunkOverlap(e.target.value)}
+                className="mt-1 block w-full border border-gray-700 rounded-md shadow-sm py-2 px-3 bg-gray-800 text-white focus:outline-none focus:ring-white focus:border-white sm:text-sm"
+                placeholder={String(DEFAULT_CHUNK_OVERLAP)}
+              />
+              <p className="mt-1 text-xs text-gray-400">Default: {DEFAULT_CHUNK_OVERLAP}</p>
+            </div>
           </div>
         </div>
       </Modal>
