@@ -7,7 +7,7 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: React.ReactNode;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'almost-screen';
   footer?: React.ReactNode;
 }
 
@@ -23,7 +23,9 @@ const Modal: React.FC<ModalProps> = ({
     sm: 'sm:max-w-sm',
     md: 'sm:max-w-md',
     lg: 'sm:max-w-lg',
-    xl: 'sm:max-w-xl'
+    xl: 'sm:max-w-xl',
+    '2xl': 'sm:max-w-2xl md:max-w-3xl lg:max-w-4xl xl:max-w-5xl', // Added a larger responsive size
+    'almost-screen': 'w-[90vw] max-w-[1600px] h-[90vh]' // New size for almost full screen
   };
 
   return (
@@ -52,8 +54,8 @@ const Modal: React.FC<ModalProps> = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className={`w-full ${sizeClasses[size]} transform overflow-hidden rounded-lg bg-gray-900 text-left align-middle shadow-xl transition-all border border-gray-700`}>
-                <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-700">
+              <Dialog.Panel className={`w-full ${sizeClasses[size]} transform overflow-hidden rounded-lg bg-gray-900 text-left align-middle shadow-xl transition-all border border-gray-700 flex flex-col`}>
+                <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-700 flex-shrink-0">
                   <Dialog.Title as="h3" className="text-lg font-medium text-white truncate">
                     {title}
                   </Dialog.Title>
@@ -66,12 +68,12 @@ const Modal: React.FC<ModalProps> = ({
                   </button>
                 </div>
                 
-                <div className="px-4 sm:px-6 py-4 max-h-[70vh] overflow-y-auto">
+                <div className={`px-4 sm:px-6 py-4 ${size === 'almost-screen' ? 'flex-grow overflow-y-auto' : 'max-h-[70vh] overflow-y-auto'}`}>
                   {children}
                 </div>
                 
                 {footer && (
-                  <div className="px-4 sm:px-6 py-4 bg-gray-800 border-t border-gray-700">
+                  <div className="px-4 sm:px-6 py-4 bg-gray-800 border-t border-gray-700 flex-shrink-0">
                     {footer}
                   </div>
                 )}

@@ -7,24 +7,33 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: { // Ensure primary color is defined for form-checkbox
-          DEFAULT: '#000000', // Your primary color
-          50: '#f8f8f8',
-          100: '#f0f0f0',
-          200: '#e4e4e4',
-          300: '#d1d1d1',
-          400: '#b4b4b4',
-          500: '#9a9a9a', // Used by focus:ring-primary-500
-          600: '#818181', // Used by text-primary-600
-          700: '#6a6a6a',
-          800: '#4d4d4d',
-          900: '#303030',
-          950: '#1a1a1a',
+        primary: {
+          DEFAULT: 'hsl(var(--primary))',
+          foreground: 'hsl(var(--primary-foreground))',
         },
+        secondary: {
+          DEFAULT: 'hsl(var(--secondary))',
+          foreground: 'hsl(var(--secondary-foreground))',
+        },
+        destructive: {
+          DEFAULT: 'hsl(var(--destructive))',
+          foreground: 'hsl(var(--destructive-foreground))',
+        },
+        muted: {
+          DEFAULT: 'hsl(var(--muted))',
+          foreground: 'hsl(var(--muted-foreground))',
+        },
+        accent: {
+          DEFAULT: 'hsl(var(--accent))',
+          foreground: 'hsl(var(--accent-foreground))',
+        },
+        // ... any other custom color extensions
       },
+      // ... any other theme extensions
     },
   },
   plugins: [
-    require('@tailwindcss/forms'), // Add this line
+    require('@tailwindcss/forms'),
+    require('@tailwindcss/typography'), // Add typography plugin
   ],
 }
