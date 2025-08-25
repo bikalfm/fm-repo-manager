@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
     import toast from 'react-hot-toast';
     import axios from 'axios'; // Import axios for temporary API instance creation
 
-    const FIXED_API_URL = 'https://fm-context-api-1022652397153.us-east1.run.app/';
+    const FIXED_API_URL = 'https://fm-medi-contextapi.finalmoment.ai/';
 
     const Settings: React.FC = () => {
       const [healthStatus, setHealthStatus] = useState<'loading' | 'healthy' | 'unhealthy'>('loading');

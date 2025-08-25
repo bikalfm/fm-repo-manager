@@ -14,7 +14,7 @@ import {
 } from '../types';
 
 // Define the fixed API URL
-const FIXED_API_URL = 'https://fm-context-api-1022652397153.us-east1.run.app/';
+const FIXED_API_URL = 'https://fm-medi-contextapi.finalmoment.ai/';
 
 // Get API URL
 const getApiUrl = () => {
