@@ -124,7 +124,9 @@ export const deleteFiles = async (repository: string, filenames: string[]): Prom
 
 
 export const downloadFile = (repository: string, path: string): string => {
-  return `${getApiUrl()}/repository/${repository}/file/download?path=${encodeURIComponent(path)}`;
+  // Remove trailing slash from base URL to avoid double slashes
+  const baseUrl = getApiUrl().replace(/\/$/, '');
+  return `${baseUrl}/repository/${repository}/file/download?path=${encodeURIComponent(path)}`;
 };
 
 // New function to get file content as Blob
