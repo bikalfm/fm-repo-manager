@@ -130,11 +130,13 @@ export const downloadFile = (repository: string, path: string): string => {
 // New function to get file content as Blob
 export const getFileBlob = async (repository: string, path: string): Promise<Blob> => {
   const url = downloadFile(repository, path); // This generates the full URL
+  console.log('Fetching file blob from URL:', url);
   const response = await fetch(url);
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`Failed to fetch file blob: ${response.status} ${response.statusText}`, errorText);
-    throw new Error(`Failed to fetch file: ${response.statusText}. Server said: ${errorText.substring(0,100)}`);
+    console.error(`Failed to fetch file blob: Status ${response.status} (${response.statusText || 'No status text'})`, errorText);
+    const statusText = response.statusText || `HTTP ${response.status}`;
+    throw new Error(`Failed to fetch file: ${statusText}. Server said: ${errorText.substring(0,200)}`);
   }
   return response.blob();
 };
