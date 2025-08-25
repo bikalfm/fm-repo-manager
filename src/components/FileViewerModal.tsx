@@ -37,15 +37,14 @@ const FileViewerModal: React.FC<FileViewerModalProps> = ({
         setObjectUrl(null);
       }
 
-      console.log('Attempting to fetch file:', {
-        repositoryName,
-        filePath: fileInfo.path,
-        fileName: fileInfo.name,
-        fullPath: fileInfo.path ? `${fileInfo.path}/${fileInfo.name}` : fileInfo.name
-      });
-      
-      // Try both the stored path and the full path (path + filename)
-      const filePathToTry = fileInfo.path ? `${fileInfo.path}/${fileInfo.name}` : fileInfo.name;
+             console.log('Attempting to fetch file:', {
+         repositoryName,
+         filePath: fileInfo.path,
+         fileName: fileInfo.name
+       });
+       
+       // Use the path directly since it already contains the full filename
+       const filePathToTry = fileInfo.path;
       
       getFileBlob(repositoryName, filePathToTry)
         .then(async (blob) => {
