@@ -1,0 +1,29 @@
+[33mcommit 2fdb4702588bcaef5c38c5ceef209a9873bd7bf1[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmigration[m[33m)[m
+Author: SaugatBAdhikari <saugat.adhikari334@gmail.com>
+Date:   Tue Sep 2 16:02:17 2025 -0400
+
+    feat: implement dual environment deployment with dev (3013) and prod (3001) ports
+    
+    - Update Dockerfile to use port 3013 for development
+    - Enhance vite.config.ts to support both dev and prod ports based on mode
+    - Add environment-specific scripts to package.json
+    - Add health endpoint to nginx.conf for monitoring
+    - Completely rewrite Jenkinsfile with comprehensive dual-environment support:
+      - Network diagnostics and port checking
+      - Comprehensive error handling with try-catch blocks
+      - Container health checks and verification
+      - Automatic script permission setting
+      - Detailed logging and troubleshooting information
+    - Add deployment scripts with error handling:
+      - deploy-dev.sh for development environment
+      - deploy-prod.sh for production environment
+      - deploy-both.sh for dual environment deployment
+    - Add comprehensive DEPLOYMENT.md documentation
+    
+    Both environments now accessible at:
+    - Development: http://jenkins.finalmoment.ai:3013
+    - Production: http://jenkins.finalmoment.ai:3001
+    
+    Note: API keys should be configured as Jenkins credentials or environment variables
+
+et --soft HEAD~2
