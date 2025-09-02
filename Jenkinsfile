@@ -31,12 +31,12 @@ pipeline {
                 sh """
                     docker run -d \
                         --name "${env.CONTAINER_NAME}" \
-                        -p 9008:80 \
+                        -p 3005:80 \
                         -e NODE_ENV=production \
                         --restart unless-stopped \
                         "${env.IMAGE_NAME}"
                 """
-                echo "Container ${env.CONTAINER_NAME} started with production image, mapped to host port 9008 from container port 80."
+                echo "Container ${env.CONTAINER_NAME} started with production image, mapped to host port 3005 from container port 80."
             }
         }
 
@@ -45,8 +45,8 @@ pipeline {
                 sleep 15
                 echo "Verifying container status..."
                 sh "docker ps -f name=${env.CONTAINER_NAME}"
-                echo "Verifying application health (Nginx should serve on port 80 inside, mapped to 9008 on host)..."
-                sh "curl -f http://localhost:9008/ || exit 1"
+                echo "Verifying application health (Nginx should serve on port 80 inside, mapped to 3005 on host)..."
+                sh "curl -f http://localhost:3005/ || exit 1"
             }
         }
     }
