@@ -1,4 +1,4 @@
-# Dev container for running Vite on 0.0.0.0:3001
+# Dev container for running Vite on 0.0.0.0:3013
 FROM node:20-alpine
 WORKDIR /app
 
@@ -10,7 +10,7 @@ RUN npm install
 COPY . .
 
 # Expose Vite dev port
-EXPOSE 3001
+EXPOSE 3013
 
 # Run the Vite dev server binding to all interfaces
 CMD ["npm", "run", "dev"]

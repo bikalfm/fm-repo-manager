@@ -1,0 +1,3 @@
+[33m14fd104[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmigration[m[33m)[m fix: remove hardcoded API keys from Jenkinsfile to comply with GitHub push protection
+[33me1a50a1[m feat: implement dual environment deployment with dev (3013) and prod (3001) ports
+[33m271fb76[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m Double slashes error
