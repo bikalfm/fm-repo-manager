@@ -109,9 +109,11 @@ pipeline {
                 echo "🚀 Deploying production environment on port ${env.PROD_PORT}..."
                 script {
                     try {
-                        // Clean up existing prod container
+                        // Clean up existing prod container and old containers using the same port
                         sh "docker stop ${env.PROD_CONTAINER_NAME} || true"
                         sh "docker rm ${env.PROD_CONTAINER_NAME} || true"
+                        sh "docker stop fm-repo-manager || true"
+                        sh "docker rm fm-repo-manager || true"
 
                         // Run production container
                         sh """
